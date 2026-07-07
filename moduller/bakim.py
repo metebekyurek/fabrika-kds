@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import veritabani
 
 
 def goster():
@@ -16,10 +17,17 @@ def goster():
     ])
 
     st.subheader("Arıza Kayıtları")
-    st.caption("Aşağıdaki tabloyu düzenleyebilir, satır ekleyip silebilirsin. Örnek verilerle başlıyor.")
+    st.caption("Tabloyu düzenle, satır ekle/sil, sonra 'Kaydet'e bas — veriler kalıcı olur.")
+
+    veritabani.tablolari_olustur()
+    kayitli = veritabani.veri_oku("arizalar")
+    if kayitli.empty:
+        baslangic_veri = ornek_veri
+    else:
+        baslangic_veri = kayitli.drop(columns=["id"]) if "id" in kayitli.columns else kayitli
 
     df = st.data_editor(
-        ornek_veri,
+        baslangic_veri,
         num_rows="dynamic",
         use_container_width=True,
         column_config={
@@ -31,6 +39,10 @@ def goster():
             "tamir_maliyeti_tl": st.column_config.NumberColumn("Tamir Maliyeti (TL)", format="%d TL"),
         }
     )
+
+    if st.button("💾 Arıza kayıtlarını kaydet"):
+        veritabani.veri_kaydet("arizalar", df)
+        st.success("✅ Kaydedildi! Uygulamayı kapatıp açsan bile bu veriler duracak.")
 
     st.markdown("---")
     st.subheader("📊 Analiz")
@@ -84,22 +96,19 @@ def goster():
     z3.metric("Toplam Gerçek Zarar", f"{gercek_zarar:,.0f} TL", delta_color="inverse")
 
     st.error(f"🔴 Bu arızalar sana toplam **{gercek_zarar:,.0f} TL**'ye mal oldu. Bunun {kacan_kar:,.0f} TL'si duran üretimden, {toplam_tamir:,.0f} TL'si tamirden.")
+
     st.markdown("---")
     st.subheader("🔮 Kök Neden ve Önleyici Bakım")
     st.caption("Geçmişe bakıp geleceği uyarır: bir sonraki arıza ne zaman, önlem almak mantıklı mı?")
 
-    # Kök neden: en sık arıza tipi
-    if "ariza_tipi" in gecerli and len(gecerli) > 0:
-        en_sik_tip = gecerli["ariza_tipi"].mode()
-        if len(en_sik_tip) > 0:
-            tip = en_sik_tip.iloc[0]
-            tip_sayi = (gecerli["ariza_tipi"] == tip).sum()
-            st.info(f"🔍 **Olası kök neden:** Arızaların {tip_sayi}/{len(gecerli)}'i **{tip}** kaynaklı. Bu sistemi öncelikli kontrol ettirmek riski azaltır.")
+    en_sik_tip = gecerli["ariza_tipi"].mode()
+    if len(en_sik_tip) > 0:
+        tip = en_sik_tip.iloc[0]
+        tip_sayi = (gecerli["ariza_tipi"] == tip).sum()
+        st.info(f"🔍 **Olası kök neden:** Arızaların {tip_sayi}/{len(gecerli)}'i **{tip}** kaynaklı. Bu sistemi öncelikli kontrol ettirmek riski azaltır.")
 
-    # Ortalama arıza başına zarar
     ortalama_zarar = gercek_zarar / len(gecerli)
 
-    # Önleyici bakım kıyası
     st.markdown("**Önleyici Bakım Kararı**")
     onleyici_maliyet = st.number_input(
         "Önleyici bakım/tamir maliyeti (ustandan aldığın fiyat, TL)",
