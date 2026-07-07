@@ -63,6 +63,17 @@ def tablolari_olustur():
             birim_fiyat_tl REAL, ortalama_gecikme_gun REAL
         )
     """)
+    # Makine Kimlik Kartları
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS makineler (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            makine_id TEXT, makine_adi TEXT, makine_tipi TEXT,
+            marka TEXT, model TEXT, uretim_yili REAL,
+            motor_gucu_kw REAL, saatlik_kapasite REAL,
+            max_yag_sicakligi_c REAL, max_titresim_mm_s REAL, max_motor_akimi_a REAL,
+            bakim_periyodu_saat REAL
+        )
+    """)
     conn.commit()
     conn.close()
 
