@@ -20,11 +20,22 @@ def goster():
     st.caption("Tabloyu düzenle, satır ekle/sil, sonra 'Kaydet'e bas — veriler kalıcı olur.")
 
     veritabani.tablolari_olustur()
-    kayitli = veritabani.veri_oku("uretim")
-    if kayitli.empty:
-        baslangic_veri = ornek_veri
+
+    yuklenen = st.file_uploader("📁 Veya Excel dosyası yükle (.xlsx)", type=["xlsx"], key="uretim_excel")
+
+    if yuklenen is not None:
+        try:
+            baslangic_veri = pd.read_excel(yuklenen)
+            st.success(f"✅ Excel okundu: {len(baslangic_veri)} satır. Kontrol edip 'Kaydet'e bas.")
+        except Exception as e:
+            st.error(f"❌ Excel okunamadı. Sütun başlıkları doğru mu? Hata: {e}")
+            baslangic_veri = ornek_veri
     else:
-        baslangic_veri = kayitli.drop(columns=["id"]) if "id" in kayitli.columns else kayitli
+        kayitli = veritabani.veri_oku("uretim")
+        if kayitli.empty:
+            baslangic_veri = ornek_veri
+        else:
+            baslangic_veri = kayitli.drop(columns=["id"]) if "id" in kayitli.columns else kayitli
 
     df = st.data_editor(
         baslangic_veri,
