@@ -1,5 +1,5 @@
 import streamlit as st
-from moduller import finans
+from moduller import finans, bakim
 
 st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
 
@@ -27,8 +27,7 @@ elif secim == "🔧 Üretim":
     st.info("Kota, fire ve operatör sapması burada olacak.")
 
 elif secim == "🛠️ Bakım":
-    st.title("🛠️ Bakım")
-    st.info("MTBF, RUL ve kök neden analizi burada olacak.")
+    bakim.goster()
 
 elif secim == "📦 Stok":
     st.title("📦 Stok")

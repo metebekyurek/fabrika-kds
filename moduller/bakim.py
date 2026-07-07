@@ -1,0 +1,86 @@
+import streamlit as st
+import pandas as pd
+
+
+def goster():
+    st.title("🛠️ Bakım — Kestirimci Bakım Merkezi")
+    st.caption("Arıza kayıtlarından MTBF, duruş maliyeti ve kök neden analizi. Elle giriş veya Excel.")
+
+    ornek_veri = pd.DataFrame([
+        {"makine_id": "PRES-01", "ariza_baslangic": "2026-06-01 08:00", "ariza_bitis": "2026-06-01 12:00",
+         "ariza_tipi": "hidrolik", "aciklama": "yağ sızıntısı", "tamir_maliyeti_tl": 3000},
+        {"makine_id": "PRES-01", "ariza_baslangic": "2026-06-15 14:00", "ariza_bitis": "2026-06-15 15:30",
+         "ariza_tipi": "mekanik", "aciklama": "rulman sesi", "tamir_maliyeti_tl": 1500},
+        {"makine_id": "PRES-01", "ariza_baslangic": "2026-06-28 09:00", "ariza_bitis": "2026-06-28 18:00",
+         "ariza_tipi": "hidrolik", "aciklama": "valf arızası", "tamir_maliyeti_tl": 5000},
+    ])
+
+    st.subheader("Arıza Kayıtları")
+    st.caption("Aşağıdaki tabloyu düzenleyebilir, satır ekleyip silebilirsin. Örnek verilerle başlıyor.")
+
+    df = st.data_editor(
+        ornek_veri,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "makine_id": "Makine",
+            "ariza_baslangic": "Arıza Başlangıç",
+            "ariza_bitis": "Arıza Bitiş",
+            "ariza_tipi": st.column_config.SelectboxColumn("Arıza Tipi", options=["mekanik", "elektrik", "hidrolik", "yazılım", "diğer"]),
+            "aciklama": "Açıklama",
+            "tamir_maliyeti_tl": st.column_config.NumberColumn("Tamir Maliyeti (TL)", format="%d TL"),
+        }
+    )
+
+    st.markdown("---")
+    st.subheader("📊 Analiz")
+
+    calisilan = df.copy()
+    calisilan["baslangic_dt"] = pd.to_datetime(calisilan["ariza_baslangic"], errors="coerce")
+    calisilan["bitis_dt"] = pd.to_datetime(calisilan["ariza_bitis"], errors="coerce")
+    gecerli = calisilan.dropna(subset=["baslangic_dt", "bitis_dt"])
+
+    if len(gecerli) == 0:
+        st.warning("Geçerli tarih içeren arıza kaydı yok. Lütfen tarihleri 'YIL-AY-GÜN SAAT:DK' formatında gir (örn. 2026-06-01 08:00).")
+        return
+
+    gecerli["durus_saat"] = (gecerli["bitis_dt"] - gecerli["baslangic_dt"]).dt.total_seconds() / 3600
+    toplam_durus = gecerli["durus_saat"].sum()
+
+    makineler = gecerli["makine_id"].unique()
+    st.markdown("**Genel Durum**")
+    g1, g2, g3 = st.columns(3)
+    g1.metric("Toplam Arıza", f"{len(gecerli)} adet")
+    g2.metric("Toplam Duruş", f"{toplam_durus:,.1f} saat")
+    g3.metric("Makine Sayısı", f"{len(makineler)}")
+
+    st.markdown("**Makine Bazında MTBF (Arızalar Arası Ortalama Süre)**")
+    for makine in makineler:
+        m_veri = gecerli[gecerli["makine_id"] == makine].sort_values("baslangic_dt")
+        if len(m_veri) < 2:
+            st.write(f"• **{makine}**: MTBF için en az 2 arıza gerekir (şu an {len(m_veri)} kayıt).")
+        else:
+            farklar = m_veri["baslangic_dt"].diff().dropna()
+            mtbf_gun = farklar.dt.total_seconds().mean() / 86400
+            m_durus = m_veri["durus_saat"].sum()
+            st.write(f"• **{makine}**: Ortalama her **{mtbf_gun:,.1f} günde** bir arızalanıyor. Toplam duruş: {m_durus:,.1f} saat.")
+
+    st.markdown("---")
+    st.subheader("💰 Duruş Maliyeti (Fırsat Maliyeti)")
+    st.caption("Makine durunca sadece tamir değil, üretilemeyen parça da kayıptır. Asıl zarar budur.")
+
+    m1, m2 = st.columns(2)
+    saatlik_uretim = m1.number_input("Bu makine saatte kaç parça üretir?", min_value=0.0, value=100.0)
+    parca_kar = m2.number_input("Parça başı kâr (TL)", min_value=0.0, value=2.0)
+
+    kacan_kar = toplam_durus * saatlik_uretim * parca_kar
+    toplam_tamir = gecerli["tamir_maliyeti_tl"].sum()
+    gercek_zarar = kacan_kar + toplam_tamir
+
+    st.markdown("**Arızaların Gerçek Bedeli**")
+    z1, z2, z3 = st.columns(3)
+    z1.metric("Kaçan Üretim Kârı", f"{kacan_kar:,.0f} TL", help="Duruş saati × saatlik üretim × parça kârı")
+    z2.metric("Toplam Tamir Gideri", f"{toplam_tamir:,.0f} TL")
+    z3.metric("Toplam Gerçek Zarar", f"{gercek_zarar:,.0f} TL", delta_color="inverse")
+
+    st.error(f"🔴 Bu arızalar sana toplam **{gercek_zarar:,.0f} TL**'ye mal oldu. Bunun {kacan_kar:,.0f} TL'si duran üretimden, {toplam_tamir:,.0f} TL'si tamirden.")
