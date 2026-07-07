@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import veritabani
 
 
 def goster():
@@ -16,10 +17,17 @@ def goster():
     ])
 
     st.subheader("Stok Durumu")
-    st.caption("Tabloyu düzenle, malzeme ekle/sil. Günlük tüketim girersen 'kaç gün yeter' hesaplanır.")
+    st.caption("Tabloyu düzenle, 'Kaydet'e bas — veriler kalıcı olur. Günlük tüketim girersen 'kaç gün yeter' hesaplanır.")
+
+    veritabani.tablolari_olustur()
+    kayitli = veritabani.veri_oku("stok")
+    if kayitli.empty:
+        baslangic_veri = ornek_veri
+    else:
+        baslangic_veri = kayitli.drop(columns=["id"]) if "id" in kayitli.columns else kayitli
 
     df = st.data_editor(
-        ornek_veri,
+        baslangic_veri,
         num_rows="dynamic",
         use_container_width=True,
         column_config={
@@ -33,6 +41,10 @@ def goster():
         }
     )
 
+    if st.button("💾 Stok kayıtlarını kaydet"):
+        veritabani.veri_kaydet("stok", df)
+        st.success("✅ Kaydedildi! Uygulamayı kapatıp açsan bile bu veriler duracak.")
+
     st.markdown("---")
     st.subheader("🚨 Kritik Seviye Uyarıları")
 
@@ -45,7 +57,6 @@ def goster():
         st.warning("Geçerli stok kaydı yok.")
         return
 
-    # Toplam stok değeri
     gecerli["stok_degeri"] = gecerli["mevcut_miktar"] * gecerli["birim_maliyet_tl"].fillna(0)
     toplam_deger = gecerli["stok_degeri"].sum()
     st.metric("Toplam Stok Değeri", f"{toplam_deger:,.0f} TL")
@@ -56,7 +67,6 @@ def goster():
         kritik = satir["kritik_seviye"] if pd.notna(satir["kritik_seviye"]) else 0
         gunluk = satir["gunluk_tuketim"] if pd.notna(satir["gunluk_tuketim"]) else 0
 
-        # Kaç gün yeter
         kalan_gun = (mevcut / gunluk) if gunluk > 0 else None
         gun_metni = f" (~{kalan_gun:,.0f} günlük)" if kalan_gun is not None else ""
 
@@ -71,6 +81,7 @@ def goster():
 
     if not uyari_var:
         st.success("Tüm stoklar yeterli seviyede.")
+
     st.markdown("---")
     st.subheader("🏷️ Tedarikçi Karnesi")
     st.caption("Aynı malzemeyi kimden almalı? Ucuz ama geç mi, pahalı ama zamanında mı? Sistem kıyaslar, kararı sen verirsin.")
@@ -81,8 +92,14 @@ def goster():
         {"tedarikci": "C Firması", "malzeme": "5mm sac levha", "birim_fiyat_tl": 45, "ortalama_gecikme_gun": 1},
     ])
 
+    ted_kayitli = veritabani.veri_oku("tedarikciler")
+    if ted_kayitli.empty:
+        ted_baslangic = ted_veri
+    else:
+        ted_baslangic = ted_kayitli.drop(columns=["id"]) if "id" in ted_kayitli.columns else ted_kayitli
+
     ted_df = st.data_editor(
-        ted_veri,
+        ted_baslangic,
         num_rows="dynamic",
         use_container_width=True,
         column_config={
@@ -92,6 +109,10 @@ def goster():
             "ortalama_gecikme_gun": st.column_config.NumberColumn("Ort. Gecikme (gün)", format="%d gün"),
         }
     )
+
+    if st.button("💾 Tedarikçileri kaydet"):
+        veritabani.veri_kaydet("tedarikciler", ted_df)
+        st.success("✅ Tedarikçi bilgileri kaydedildi.")
 
     ted_calisilan = ted_df.copy()
     ted_calisilan["birim_fiyat_tl"] = pd.to_numeric(ted_calisilan["birim_fiyat_tl"], errors="coerce")
@@ -118,4 +139,4 @@ def goster():
     gecikme_maliyeti = gecikme_gun * gunluk_uretim_kaybi * parca_kar_gecikme
 
     if gecikme_maliyeti > 0:
-        st.error(f"🔴 Bu gecikme sana olası minimum **{gecikme_maliyeti:,.0f} TL** kâr kaybettiriyor ({gecikme_gun:,.0f} gün × {gunluk_uretim_kaybi:,.0f} adet × {parca_kar_gecikme:,.0f} TL). Bir sonraki siparişte teslim güvenilirliği yüksek tedarikçiyi tercih etmek bu kaybı önleyebilir.")        
+        st.error(f"🔴 Bu gecikme sana olası minimum **{gecikme_maliyeti:,.0f} TL** kâr kaybettiriyor ({gecikme_gun:,.0f} gün × {gunluk_uretim_kaybi:,.0f} adet × {parca_kar_gecikme:,.0f} TL). Bir sonraki siparişte teslim güvenilirliği yüksek tedarikçiyi tercih etmek bu kaybı önleyebilir.")

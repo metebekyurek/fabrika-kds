@@ -3,8 +3,7 @@ import pandas as pd
 import streamlit as st
 import pandas as pd
 import requests
-
-
+import veritabani
 
 def goster():
     st.title("⚡ Enerji — Tüketim ve Fatura Analizi")
@@ -20,10 +19,17 @@ def goster():
     ])
 
     st.subheader("Geçmiş Faturalar")
-    st.caption("Faturalarını gir. Sistem tüketim desenini öğrenip gelecek faturayı tahmin eder.")
+    st.caption("Faturalarını gir, 'Kaydet'e bas — veriler kalıcı olur. Sistem tüketim desenini öğrenip gelecek faturayı tahmin eder.")
+
+    veritabani.tablolari_olustur()
+    kayitli = veritabani.veri_oku("enerji")
+    if kayitli.empty:
+        baslangic_veri = ornek_veri
+    else:
+        baslangic_veri = kayitli.drop(columns=["id"]) if "id" in kayitli.columns else kayitli
 
     df = st.data_editor(
-        ornek_veri,
+        baslangic_veri,
         num_rows="dynamic",
         use_container_width=True,
         column_config={
@@ -32,6 +38,10 @@ def goster():
             "toplam_tutar_tl": st.column_config.NumberColumn("Tutar (TL)", format="%d TL"),
         }
     )
+
+    if st.button("💾 Faturaları kaydet"):
+        veritabani.veri_kaydet("enerji", df)
+        st.success("✅ Kaydedildi! Uygulamayı kapatıp açsan bile bu veriler duracak.")
 
     st.markdown("---")
     st.subheader("📈 Tahmini Gelecek Fatura")

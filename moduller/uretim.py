@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import veritabani
 
 
 def goster():
@@ -16,10 +17,17 @@ def goster():
     ])
 
     st.subheader("Üretim Kayıtları")
-    st.caption("Tabloyu düzenle, satır ekle/sil. Hedef girmezsen sistem geçmiş ortalamayı referans alır.")
+    st.caption("Tabloyu düzenle, satır ekle/sil, sonra 'Kaydet'e bas — veriler kalıcı olur.")
+
+    veritabani.tablolari_olustur()
+    kayitli = veritabani.veri_oku("uretim")
+    if kayitli.empty:
+        baslangic_veri = ornek_veri
+    else:
+        baslangic_veri = kayitli.drop(columns=["id"]) if "id" in kayitli.columns else kayitli
 
     df = st.data_editor(
-        ornek_veri,
+        baslangic_veri,
         num_rows="dynamic",
         use_container_width=True,
         column_config={
@@ -34,6 +42,10 @@ def goster():
             "fire_nedeni": st.column_config.SelectboxColumn("Fire Nedeni", options=["ayar", "hammadde", "kalıp", "operatör", "diğer"]),
         }
     )
+
+    if st.button("💾 Üretim kayıtlarını kaydet"):
+        veritabani.veri_kaydet("uretim", df)
+        st.success("✅ Kaydedildi! Uygulamayı kapatıp açsan bile bu veriler duracak.")
 
     st.markdown("---")
     st.subheader("📊 Sapma Analizi")
@@ -57,7 +69,6 @@ def goster():
     g2.metric("Toplam Fire", f"{toplam_fire:,.0f} adet")
     g3.metric("Fire Oranı", f"%{fire_orani:,.1f}")
 
-    # Hedefe göre sapma (hedef girilmişse)
     hedefli = gecerli.dropna(subset=["hedef_adet"])
     hedefli = hedefli[hedefli["hedef_adet"] > 0]
     if len(hedefli) > 0:
@@ -69,11 +80,12 @@ def goster():
                 st.write(f"• {etiket}: hedefin **%{sapma:,.1f} üstünde** ✅")
             else:
                 st.write(f"• {etiket}: hedefin **%{abs(sapma):,.1f} altında** ⚠️")
+
     st.markdown("---")
     st.subheader("🔍 Fire Nedeni Analizi")
     st.caption("Firelerin çoğu nereden geliyor? Asıl kaybın kaynağını gösterir.")
 
-    if "fire_nedeni" in gecerli and gecerli["fire_adet"].sum() > 0:
+    if gecerli["fire_adet"].sum() > 0:
         fire_grup = gecerli.groupby("fire_nedeni")["fire_adet"].sum().sort_values(ascending=False)
         en_buyuk_neden = fire_grup.index[0]
         en_buyuk_deger = fire_grup.iloc[0]
@@ -89,12 +101,11 @@ def goster():
     st.subheader("🌙 Vardiya Karşılaştırması")
     st.caption("Hangi vardiya daha verimli? Fark varsa görünür.")
 
-    if "vardiya" in gecerli:
-        vardiya_grup = gecerli.groupby("vardiya").agg(
-            toplam_uretim=("uretilen_adet", "sum"),
-            toplam_fire=("fire_adet", "sum")
-        )
-        vardiya_grup["fire_orani"] = (vardiya_grup["toplam_fire"] / (vardiya_grup["toplam_uretim"] + vardiya_grup["toplam_fire"]) * 100)
-        st.markdown("**Vardiya bazında:**")
-        for vardiya, satir in vardiya_grup.iterrows():
-            st.write(f"• **{vardiya}**: {satir['toplam_uretim']:,.0f} adet üretim, fire oranı %{satir['fire_orani']:,.1f}")                
+    vardiya_grup = gecerli.groupby("vardiya").agg(
+        toplam_uretim=("uretilen_adet", "sum"),
+        toplam_fire=("fire_adet", "sum")
+    )
+    vardiya_grup["fire_orani"] = (vardiya_grup["toplam_fire"] / (vardiya_grup["toplam_uretim"] + vardiya_grup["toplam_fire"]) * 100)
+    st.markdown("**Vardiya bazında:**")
+    for vardiya, satir in vardiya_grup.iterrows():
+        st.write(f"• **{vardiya}**: {satir['toplam_uretim']:,.0f} adet üretim, fire oranı %{satir['fire_orani']:,.1f}")

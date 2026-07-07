@@ -27,7 +27,42 @@ def tablolari_olustur():
             tamir_maliyeti_tl REAL
         )
     """)
+# Üretim kayıtları (Üretim modülü)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS uretim (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TEXT, vardiya TEXT, makine_id TEXT, operator_id TEXT,
+            urun_kodu TEXT, hedef_adet REAL, uretilen_adet REAL,
+            fire_adet REAL, fire_nedeni TEXT
+        )
+    """)
 
+    # Enerji faturaları (Enerji modülü)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS enerji (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            donem TEXT, toplam_tuketim_kwh REAL, toplam_tutar_tl REAL
+        )
+    """)
+
+    # Stok kartları (Stok modülü)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS stok (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            malzeme_adi TEXT, tur TEXT, birim TEXT,
+            mevcut_miktar REAL, kritik_seviye REAL,
+            gunluk_tuketim REAL, birim_maliyet_tl REAL
+        )
+    """)
+
+    # Tedarikçiler (Stok modülü)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS tedarikciler (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tedarikci TEXT, malzeme TEXT,
+            birim_fiyat_tl REAL, ortalama_gecikme_gun REAL
+        )
+    """)
     conn.commit()
     conn.close()
 
