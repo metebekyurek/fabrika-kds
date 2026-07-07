@@ -1,5 +1,5 @@
 import streamlit as st
-from moduller import finans, bakim, uretim 
+from moduller import finans, bakim, uretim, enerji 
 
 st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
 
@@ -19,8 +19,7 @@ elif secim == "💰 Finans":
     finans.goster()
 
 elif secim == "⚡ Enerji":
-    st.title("⚡ Enerji")
-    st.info("Fatura tahmini, tarife ve GES takibi burada olacak.")
+    enerji.goster()
 
 elif secim == "🔧 Üretim":
     uretim.goster()
