@@ -84,3 +84,36 @@ def goster():
     z3.metric("Toplam Gerçek Zarar", f"{gercek_zarar:,.0f} TL", delta_color="inverse")
 
     st.error(f"🔴 Bu arızalar sana toplam **{gercek_zarar:,.0f} TL**'ye mal oldu. Bunun {kacan_kar:,.0f} TL'si duran üretimden, {toplam_tamir:,.0f} TL'si tamirden.")
+    st.markdown("---")
+    st.subheader("🔮 Kök Neden ve Önleyici Bakım")
+    st.caption("Geçmişe bakıp geleceği uyarır: bir sonraki arıza ne zaman, önlem almak mantıklı mı?")
+
+    # Kök neden: en sık arıza tipi
+    if "ariza_tipi" in gecerli and len(gecerli) > 0:
+        en_sik_tip = gecerli["ariza_tipi"].mode()
+        if len(en_sik_tip) > 0:
+            tip = en_sik_tip.iloc[0]
+            tip_sayi = (gecerli["ariza_tipi"] == tip).sum()
+            st.info(f"🔍 **Olası kök neden:** Arızaların {tip_sayi}/{len(gecerli)}'i **{tip}** kaynaklı. Bu sistemi öncelikli kontrol ettirmek riski azaltır.")
+
+    # Ortalama arıza başına zarar
+    ortalama_zarar = gercek_zarar / len(gecerli)
+
+    # Önleyici bakım kıyası
+    st.markdown("**Önleyici Bakım Kararı**")
+    onleyici_maliyet = st.number_input(
+        "Önleyici bakım/tamir maliyeti (ustandan aldığın fiyat, TL)",
+        min_value=0.0, value=3000.0,
+        help="Sistem bunu tahmin etmez — usta fiyatını sen gir."
+    )
+
+    k1, k2 = st.columns(2)
+    k1.metric("Önlem alırsan (maliyet)", f"{onleyici_maliyet:,.0f} TL")
+    k2.metric("Arızayı beklersen (olası zarar)", f"{ortalama_zarar:,.0f} TL",
+              help="Geçmiş arıza başına ortalama gerçek zarar (tamir + duran üretim)")
+
+    if ortalama_zarar > onleyici_maliyet:
+        kazanc = ortalama_zarar - onleyici_maliyet
+        st.success(f"🟢 **Önlem almak mantıklı.** Şimdi {onleyici_maliyet:,.0f} TL harcayıp, olası bir arızanın ~{ortalama_zarar:,.0f} TL'lik bedelini önleyebilirsin. Olası minimum net kazanç: **{kazanc:,.0f} TL**.")
+    else:
+        st.warning(f"🟡 Bu durumda önleyici bakım maliyeti ({onleyici_maliyet:,.0f} TL), ortalama arıza zararından ({ortalama_zarar:,.0f} TL) yüksek. Beklemek şimdilik daha ekonomik olabilir — ama arıza sıklığı artarsa bu değişir.")
