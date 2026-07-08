@@ -74,6 +74,14 @@ def tablolari_olustur():
             bakim_periyodu_saat REAL
         )
     """)
+    # Canlı ölçümler (sensör veya Excel)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS olcumler (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            makine_id TEXT, zaman TEXT,
+            parametre TEXT, deger REAL, birim TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 

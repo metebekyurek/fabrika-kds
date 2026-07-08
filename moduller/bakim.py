@@ -1,12 +1,42 @@
 import streamlit as st
 import pandas as pd
 import veritabani
-
+import mqtt_dinleyici
 
 def goster():
     st.title("🛠️ Bakım — Kestirimci Bakım Merkezi")
     st.caption("Arıza kayıtlarından MTBF, duruş maliyeti ve kök neden analizi. Elle giriş veya Excel.")
+    # === CANLI SENSÖR AKIŞI (MQTT) ===
+    with st.expander("📡 Canlı Sensör Akışı (MQTT) — tıkla aç/kapa", expanded=False):
+        if "mqtt_basladi" not in st.session_state:
+            mqtt_dinleyici.dinlemeye_basla()
+            st.session_state["mqtt_basladi"] = True
 
+        st.caption("Sensörlerden gelen canlı veri. Makine sınırlarıyla anlık kıyaslanır.")
+
+        if st.button("🔄 Canlı verileri yenile"):
+            pass  # butona basınca sayfa yenilenir, yeni veri gelir
+
+        canli = mqtt_dinleyici.olcumleri_al()
+        if not canli:
+            st.info("⏳ Henüz veri gelmedi. 'sahte_sensor.py' çalışıyor mu? Birkaç saniye sonra 'Yenile'ye bas.")
+        else:
+            canli_df = pd.DataFrame(canli).tail(10).iloc[::-1]  # son 10, en yeni üstte
+            st.dataframe(canli_df, use_container_width=True, hide_index=True)
+
+            # Anlık sınır kontrolü
+            makine_df = veritabani.veri_oku("makineler")
+            if not makine_df.empty:
+                sinir_haritasi = {"yag_sicakligi": "max_yag_sicakligi_c", "titresim": "max_titresim_mm_s", "motor_akimi": "max_motor_akimi_a"}
+                for olcum in canli[-4:]:  # son birkaç ölçümü kontrol et
+                    param = olcum.get("parametre")
+                    if param in sinir_haritasi:
+                        m_satir = makine_df[makine_df["makine_id"] == olcum.get("makine_id")]
+                        if not m_satir.empty:
+                            sinir = pd.to_numeric(m_satir.iloc[0].get(sinir_haritasi[param]), errors="coerce")
+                            deger = olcum.get("deger", 0)
+                            if pd.notna(sinir) and sinir > 0 and deger > sinir:
+                                st.error(f"🔴 CANLI ALARM: **{olcum['makine_id']}** · {param} = {deger} {olcum['birim']} (sınır {sinir:.0f} aşıldı!)")
     ornek_veri = pd.DataFrame([
         {"makine_id": "PRES-01", "ariza_baslangic": "2026-06-01 08:00", "ariza_bitis": "2026-06-01 12:00",
          "ariza_tipi": "hidrolik", "aciklama": "yağ sızıntısı", "tamir_maliyeti_tl": 3000},
@@ -138,3 +168,92 @@ def goster():
         st.success(f"🟢 **Önlem almak mantıklı.** Şimdi {onleyici_maliyet:,.0f} TL harcayıp, olası bir arızanın ~{ortalama_zarar:,.0f} TL'lik bedelini önleyebilirsin. Olası minimum net kazanç: **{kazanc:,.0f} TL**.")
     else:
         st.warning(f"🟡 Bu durumda önleyici bakım maliyeti ({onleyici_maliyet:,.0f} TL), ortalama arıza zararından ({ortalama_zarar:,.0f} TL) yüksek. Beklemek şimdilik daha ekonomik olabilir — ama arıza sıklığı artarsa bu değişir.")
+    st.markdown("---")
+    st.subheader("📡 Canlı Ölçüm Takibi (Sensör / Excel)")
+    st.caption("Makine ölçümlerini gir. Sistem, Makineler sayfasındaki kritik sınırlarla kıyaslayıp uyarır.")
+
+    olcum_ornek = pd.DataFrame([
+        {"makine_id": "PRES-01", "zaman": "2026-07-08 10:00", "parametre": "yag_sicakligi", "deger": 75, "birim": "°C"},
+        {"makine_id": "PRES-01", "zaman": "2026-07-08 10:00", "parametre": "titresim", "deger": 3.2, "birim": "mm/s"},
+        {"makine_id": "CNC-01", "zaman": "2026-07-08 10:00", "parametre": "yag_sicakligi", "deger": 60, "birim": "°C"},
+        {"makine_id": "CNC-01", "zaman": "2026-07-08 10:00", "parametre": "titresim", "deger": 3.5, "birim": "mm/s"},
+    ])
+
+    olcum_yuklenen = st.file_uploader("📁 Ölçüm Excel'i yükle (.xlsx)", type=["xlsx"], key="olcum_excel")
+    if olcum_yuklenen is not None:
+        try:
+            olcum_baslangic = pd.read_excel(olcum_yuklenen)
+            st.success(f"✅ Ölçüm Excel'i okundu: {len(olcum_baslangic)} satır.")
+        except Exception as e:
+            st.error(f"❌ Okunamadı. Hata: {e}")
+            olcum_baslangic = olcum_ornek
+    else:
+        olcum_kayitli = veritabani.veri_oku("olcumler")
+        if olcum_kayitli.empty:
+            olcum_baslangic = olcum_ornek
+        else:
+            olcum_baslangic = olcum_kayitli.drop(columns=["id"]) if "id" in olcum_kayitli.columns else olcum_kayitli
+
+    olcum_df = st.data_editor(
+        olcum_baslangic,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "makine_id": "Makine",
+            "zaman": "Zaman",
+            "parametre": st.column_config.SelectboxColumn("Parametre", options=["titresim", "yag_sicakligi", "motor_sicakligi", "motor_akimi", "basinc", "devir"]),
+            "deger": st.column_config.NumberColumn("Değer", format="%.1f"),
+            "birim": "Birim",
+        }
+    )
+
+    if st.button("💾 Ölçümleri kaydet"):
+        veritabani.veri_kaydet("olcumler", olcum_df)
+        st.success("✅ Ölçümler kaydedildi.")
+
+    # === SINIR KONTROLÜ: ölçümü Makine Kimlik Kartı ile kıyasla ===
+    st.markdown("**🚦 Sınır Kontrolü**")
+    makine_df = veritabani.veri_oku("makineler")
+
+    if makine_df.empty:
+        st.warning("⚠️ Henüz makine tanımlı değil. Sınır kontrolü için önce 'Makineler' sayfasından kimlik kartı gir ve kaydet.")
+    else:
+        # Parametre adı -> Kimlik Kartı'ndaki sınır sütunu eşleşmesi
+        sinir_haritasi = {
+            "yag_sicakligi": "max_yag_sicakligi_c",
+            "titresim": "max_titresim_mm_s",
+            "motor_akimi": "max_motor_akimi_a",
+        }
+
+        uyari_cikti = False
+        olcum_calisilan = olcum_df.copy()
+        olcum_calisilan["deger"] = pd.to_numeric(olcum_calisilan["deger"], errors="coerce")
+
+        for _, olcum in olcum_calisilan.iterrows():
+            m_id = olcum["makine_id"]
+            param = olcum["parametre"]
+            deger = olcum["deger"]
+
+            if param not in sinir_haritasi or pd.isna(deger):
+                continue
+
+            sinir_kolonu = sinir_haritasi[param]
+            makine_satiri = makine_df[makine_df["makine_id"] == m_id]
+
+            if makine_satiri.empty or sinir_kolonu not in makine_satiri.columns:
+                continue
+
+            sinir = pd.to_numeric(makine_satiri.iloc[0][sinir_kolonu], errors="coerce")
+            if pd.isna(sinir) or sinir == 0:
+                continue
+
+            if deger > sinir:
+                uyari_cikti = True
+                asim = ((deger - sinir) / sinir) * 100
+                st.error(f"🔴 **{m_id}** · {param}: ölçülen **{deger:.1f}** {olcum['birim']}, kritik sınır **{sinir:.0f}**. Sınır %{asim:.0f} aşıldı — **olası arıza riski, kontrol ettir.**")
+            elif deger > sinir * 0.9:
+                uyari_cikti = True
+                st.warning(f"🟡 **{m_id}** · {param}: ölçülen **{deger:.1f}** {olcum['birim']}, sınıra ({sinir:.0f}) yaklaşıyor. İzlemede tut.")
+
+        if not uyari_cikti:
+            st.success("🟢 Tüm ölçümler kritik sınırların altında. Makineler sağlıklı görünüyor.")
