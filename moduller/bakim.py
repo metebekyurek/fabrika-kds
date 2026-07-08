@@ -14,8 +14,11 @@ def goster():
 
         st.caption("Sensörlerden gelen canlı veri. Makine sınırlarıyla anlık kıyaslanır.")
 
-        if st.button("🔄 Canlı verileri yenile"):
-            pass  # butona basınca sayfa yenilenir, yeni veri gelir
+        st.caption("Sensörlerden gelen canlı veri. Makine sınırlarıyla anlık kıyaslanır.")
+
+        otomatik = st.checkbox("🔄 Otomatik yenile (her 3 saniyede)", value=False, key="mqtt_oto")
+        if otomatik:
+            st.caption("🟢 Canlı mod açık — sayfa kendini yeniliyor.")
 
         canli = mqtt_dinleyici.olcumleri_al()
         if not canli:
@@ -37,6 +40,11 @@ def goster():
                             deger = olcum.get("deger", 0)
                             if pd.notna(sinir) and sinir > 0 and deger > sinir:
                                 st.error(f"🔴 CANLI ALARM: **{olcum['makine_id']}** · {param} = {deger} {olcum['birim']} (sınır {sinir:.0f} aşıldı!)")
+        # Otomatik yenileme: canlı mod açıksa 3 saniyede bir sayfayı tazele
+        if otomatik:
+            import time
+            time.sleep(3)
+            st.rerun()                                                      
     ornek_veri = pd.DataFrame([
         {"makine_id": "PRES-01", "ariza_baslangic": "2026-06-01 08:00", "ariza_bitis": "2026-06-01 12:00",
          "ariza_tipi": "hidrolik", "aciklama": "yağ sızıntısı", "tamir_maliyeti_tl": 3000},
