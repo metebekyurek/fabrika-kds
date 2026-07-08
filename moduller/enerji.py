@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import veritabani
+from grafikler import enerji_grafigi
 
 def goster():
     st.title("⚡ Enerji — Tüketim ve Fatura Analizi")
@@ -53,7 +54,10 @@ def goster():
     if st.button("💾 Faturaları kaydet"):
         veritabani.veri_kaydet("enerji", df)
         st.success("✅ Kaydedildi! Uygulamayı kapatıp açsan bile bu veriler duracak.")
-
+    st.markdown("---")
+    st.subheader("📊 Tüketim ve Fatura Grafiği")
+    enerji_grafigi(df)
+    
     st.markdown("---")
     st.subheader("📈 Tahmini Gelecek Fatura")
 

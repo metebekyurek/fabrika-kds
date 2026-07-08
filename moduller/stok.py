@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import veritabani
+from grafikler import stok_grafigi
 
 
 def goster():
@@ -71,6 +72,8 @@ def goster():
     gecerli["stok_degeri"] = gecerli["mevcut_miktar"] * gecerli["birim_maliyet_tl"].fillna(0)
     toplam_deger = gecerli["stok_degeri"].sum()
     st.metric("Toplam Stok Değeri", f"{toplam_deger:,.0f} TL")
+    stok_grafigi(gecerli)
+     
 
     uyari_var = False
     for _, satir in gecerli.iterrows():

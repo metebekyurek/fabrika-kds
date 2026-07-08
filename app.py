@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
-from moduller import finans, bakim, uretim, enerji, stok, makineler  
-
+from moduller import finans, bakim, uretim, enerji, stok, makineler
+from doviz_seridi import doviz_seridi_goster 
+from grafikler import uretim_trend_grafigi
 st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
 
 st.sidebar.title("🏭 Fabrika KDS")
@@ -46,7 +47,8 @@ if secim == "📊 Günün Özeti":
     else:
         k3.metric("🔧 Toplam Üretim", "0 adet")
         k4.metric("♻️ Fire Oranı", "%0")
-
+    st.subheader("📈 Üretim Trendi")
+    uretim_trend_grafigi(uretim_df)
     st.markdown("---")
 
     # Kritik stok uyarıları
@@ -70,7 +72,9 @@ if secim == "📊 Günün Özeti":
 
     st.markdown("---")
     st.info("💡 Detaylı analiz için sol menüden ilgili modüle girebilirsin. Bu özet, kaydettiğin verilerden otomatik oluşur.")
-
+    st.markdown("---")
+    st.subheader("💱 Güncel Kurlar")
+    doviz_seridi_goster()
 elif secim == "💰 Finans":
     finans.goster()
 

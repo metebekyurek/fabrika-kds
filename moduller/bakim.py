@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import veritabani
 import mqtt_dinleyici
+from grafikler import bakim_grafigi
 
 def goster():
     st.title("🛠️ Bakım — Kestirimci Bakım Merkezi")
@@ -126,7 +127,10 @@ def goster():
             mtbf_gun = farklar.dt.total_seconds().mean() / 86400
             m_durus = m_veri["durus_saat"].sum()
             st.write(f"• **{makine}**: Ortalama her **{mtbf_gun:,.1f} günde** bir arızalanıyor. Toplam duruş: {m_durus:,.1f} saat.")
-
+    
+    st.markdown("**Makine Başına Tamir Maliyeti**")
+    bakim_grafigi(gecerli) 
+    
     st.markdown("---")
     st.subheader("💰 Duruş Maliyeti (Fırsat Maliyeti)")
     st.caption("Makine durunca sadece tamir değil, üretilemeyen parça da kayıptır. Asıl zarar budur.")
