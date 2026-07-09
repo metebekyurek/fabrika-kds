@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from moduller import finans, bakim, uretim, enerji, stok, makineler
+from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi 
 from doviz_seridi import doviz_seridi_goster 
 from grafikler import uretim_trend_grafigi
 st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
@@ -8,9 +8,10 @@ st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
 st.sidebar.title("🏭 Fabrika KDS")
 st.sidebar.caption("Entegre Karar Destek Sistemi")
 
+
 secim = st.sidebar.radio(
     "Menü",
-    ["📊 Günün Özeti", "💰 Finans", "⚡ Enerji", "🔧 Üretim", "🛠️ Bakım", "📦 Stok", "⚙️ Makineler"]
+    ["📊 Günün Özeti", "💸 Kâr Sızıntısı", "💰 Finans", "⚡ Enerji", "🔧 Üretim", "🛠️ Bakım", "📦 Stok", "⚙️ Makineler"]
 )
 
 if secim == "📊 Günün Özeti":
@@ -92,3 +93,6 @@ elif secim == "📦 Stok":
 
 elif secim == "⚙️ Makineler":
     makineler.goster()    
+
+elif secim == "💸 Kâr Sızıntısı":
+    kar_sizintisi.goster()

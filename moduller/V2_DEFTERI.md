@@ -21,3 +21,7 @@ Kural: "Fabrikanın bir sinyalini paraya çeviriyor mu?" Evet → ürüne. Hayı
 - Token kontrolü: paket seviyelerine kullanım limiti (örn. Temel 100/ay, Pro sınırsız)
 - Sıra: EN SON — temel ürün (görsel, Excel, dayanıklılık, çoklu firma) oturduktan sonra
 - Uygulama alanları: Bakım yorumu, Finans marj analizi, Dashboard günlük brifing
+## Piyasa Verileri (kademeli)
+- ŞİMDİ (bedava): Döviz kurları canlı — Günün Özeti altında şerit (dolar/euro/TL)
+- İLERİDE (ücretli, yatırımcı/gelir gelince): Gerçek zamanlı emtia (çelik, sac, alüminyum) API'si
+- Ara çözüm: emtia fiyatını firma elle girer, sistem "güncel mi?" diye hatırlatır
