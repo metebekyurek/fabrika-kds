@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi
+from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi, gunluk_ozet_mail 
 from doviz_seridi import doviz_seridi_goster
 from grafikler import uretim_trend_grafigi
 st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
@@ -11,7 +11,7 @@ st.sidebar.caption("Entegre Karar Destek Sistemi")
 
 secim = st.sidebar.radio(
     "Menü",
-    ["📊 Günün Özeti", "💸 Kâr Sızıntısı", "🧠 Çapraz Zekâ", "🎚️ Simülatör", "📄 PDF Rapor", "💰 Finans", "⚡ Enerji", "🔧 Üretim", "🛠️ Bakım", "📅 Bakım Takvimi", "📦 Stok", "⚙️ Makineler"])
+    ["📊 Günün Özeti", "💸 Kâr Sızıntısı", "🧠 Çapraz Zekâ", "🎚️ Simülatör", "📄 PDF Rapor", "💰 Finans", "⚡ Enerji", "🔧 Üretim", "🛠️ Bakım", "📅 Bakım Takvimi", "📦 Stok", "⚙️ Makineler", "📧 Günün Özeti Maili"])
 if secim == "📊 Günün Özeti":
     import veritabani
     veritabani.tablolari_olustur()
@@ -101,4 +101,6 @@ elif secim == "🎚️ Simülatör":
 elif secim == "📄 PDF Rapor":
     pdf_rapor.goster()
 elif secim == "📅 Bakım Takvimi":
-    bakim_takvimi.goster()
+    bakim_takvimi.goster()   
+elif secim == "📧 Günün Özeti Maili":
+    gunluk_ozet_mail.goster()
