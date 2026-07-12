@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import veritabani
-from moduller import mail_gonder
+import hesap_motoru
+from moduller import mail_gonder, ayarlar
 
-def _ozet_html_uret(saatlik_uretim, parca_kar):
+def _ozet_html_uret():
     """Kayıtlı verilerden günün özeti + kritik uyarıları HTML mail olarak hazırlar."""
     veritabani.tablolari_olustur()
     ariza_df = veritabani.veri_oku("arizalar")
@@ -54,12 +55,9 @@ def _ozet_html_uret(saatlik_uretim, parca_kar):
             elif kalan <= 14:
                 uyarilar.append(("#F4A261", f"🟡 BAKIM: {mid} bakımına {kalan} gün kaldı."))
 
-    # --- Kâr sızıntısı toplamı ---
-    sizinti = 0.0
-    if not ariza_df.empty and "tamir_maliyeti_tl" in ariza_df.columns:
-        sizinti += pd.to_numeric(ariza_df["tamir_maliyeti_tl"], errors="coerce").fillna(0).sum()
-    if not uretim_df.empty and "fire_adet" in uretim_df.columns:
-        sizinti += pd.to_numeric(uretim_df["fire_adet"], errors="coerce").fillna(0).sum() * parca_kar
+    # --- Kâr sızıntısı toplamı (hesap motorundan) ---
+    kalemler = hesap_motoru.sizinti_kalemleri()
+    sizinti = sum(k[1] for k in kalemler)
 
     # --- HTML kur ---
     tarih_str = datetime.now().strftime("%d.%m.%Y")
@@ -96,13 +94,14 @@ def goster():
     st.title("📧 Günün Özeti Maili")
     st.caption("O günün kritik uyarılarını (stok, bakım, sızıntı) tek mailde topla, patrona gönder.")
 
-    alici = st.text_input("Maili kime gönderelim? (patron / kendi adresin)")
-    p1, p2 = st.columns(2)
-    saatlik = p1.number_input("Makine saatte kaç parça üretir?", min_value=0.0, value=100.0, key="ozet_saatlik")
-    kar = p2.number_input("Parça başı kâr (TL)", min_value=0.0, value=2.0, key="ozet_kar")
+    mevcut_ayar = ayarlar.ayarlari_oku()
+    varsayilan_mail = mevcut_ayar.get("yonetici_mail", "")
+
+    alici = st.text_input("Maili kime gönderelim?", value=varsayilan_mail)
+    st.caption("💡 Yönetici e-postasını ⚙️ Fabrika Ayarları'ndan kalıcı olarak kaydedebilirsin.")
 
     st.markdown("**Mail önizlemesi:**")
-    html = _ozet_html_uret(saatlik, kar)
+    html = _ozet_html_uret()
     st.components.v1.html(html, height=400, scrolling=True)
 
     if st.button("📨 Özet mailini gönder"):
@@ -110,7 +109,9 @@ def goster():
             st.warning("Lütfen geçerli bir mail adresi gir.")
             return
         with st.spinner("Gönderiliyor..."):
-            basarili, mesaj = mail_gonder.mail_gonder(alici, f"Fabrika KDS — Günün Özeti ({datetime.now().strftime('%d.%m.%Y')})", html)
+            basarili, mesaj = mail_gonder.mail_gonder(
+                alici, f"Fabrika KDS — Günün Özeti ({datetime.now().strftime('%d.%m.%Y')})", html
+            )
         if basarili:
             st.success(f"✅ {mesaj}")
         else:
