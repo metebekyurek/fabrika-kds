@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi, gunluk_ozet_mail, ayarlar, urunler  
+from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi, gunluk_ozet_mail, ayarlar, urunler, demo_veri   
 from doviz_seridi import doviz_seridi_goster
 from grafikler import uretim_trend_grafigi
 st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
@@ -11,7 +11,7 @@ st.sidebar.caption("Entegre Karar Destek Sistemi")
 
 secim = st.sidebar.radio(
     "Menü",
-["📊 Günün Özeti", "💸 Kâr Sızıntısı", "🧠 Çapraz Zekâ", "🎚️ Simülatör", "📄 PDF Rapor", "💰 Finans", "⚡ Enerji", "🔧 Üretim", "🛠️ Bakım", "📅 Bakım Takvimi", "📦 Stok", "⚙️ Makineler", "📧 Günün Özeti Maili", "⚙️ Fabrika Ayarları","📦 Ürünler"])
+["📊 Günün Özeti", "💸 Kâr Sızıntısı", "🧠 Çapraz Zekâ", "🎚️ Simülatör", "📄 PDF Rapor", "💰 Finans", "⚡ Enerji", "🔧 Üretim", "🛠️ Bakım", "📅 Bakım Takvimi", "📦 Stok", "⚙️ Makineler", "📧 Günün Özeti Maili", "⚙️ Fabrika Ayarları","📦 Ürünler", "🎬 Demo Verisi"])
 if secim == "📊 Günün Özeti":
     import veritabani
     veritabani.tablolari_olustur()
@@ -108,3 +108,5 @@ elif secim == "⚙️ Fabrika Ayarları":
     ayarlar.goster()
 elif secim == "📦 Ürünler":
     urunler.goster()
+elif secim == "🎬 Demo Verisi":
+    demo_veri.goster()    
