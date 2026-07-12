@@ -162,6 +162,39 @@ def goster():
         st.caption("Bu çıkarım için Enerji modülüne fatura kaydı gir.")
 
     # ==========================================================
+    # ==========================================================
+    # ÇIKARIM 4: Vardiya ↔ Fire
+    # Gece/gündüz fire ORANLARI farklı mı? Fark TL'ye çevrilir.
+    # Oran kıyası önemli: az üreten vardiyanın az fire vermesi normal.
+    # ==========================================================
+    st.markdown("---")
+    st.subheader("🌙 Vardiya ↔ Fire Bağlantısı")
+
+    import hesap_motoru
+    vardiya_ozet, vardiya_fark_tl = hesap_motoru.vardiya_kiyasi()
+
+    if vardiya_ozet.empty:
+        st.caption("Bu çıkarım için hem gündüz hem gece vardiyasında üretim kaydı gerekiyor.")
+    else:
+        gosterim = vardiya_ozet.copy()
+        gosterim["fire_orani"] = gosterim["fire_orani"].round(1)
+        gosterim["fire_kaybi_tl"] = gosterim["fire_kaybi_tl"].round(0)
+        gosterim.columns = ["Vardiya", "Üretim (adet)", "Fire (adet)", "Fire Kaybı (TL)", "Fire Oranı (%)"]
+        st.dataframe(gosterim, use_container_width=True, hide_index=True)
+
+        if vardiya_fark_tl > 0:
+            bulundu = True
+            iyi = vardiya_ozet.loc[vardiya_ozet["fire_orani"].idxmin()]
+            kotu = vardiya_ozet.loc[vardiya_ozet["fire_orani"].idxmax()]
+            st.warning(
+                f"⚠️ **{kotu['vardiya'].capitalize()}** vardiyasının fire oranı (%{kotu['fire_orani']:.1f}), "
+                f"**{iyi['vardiya']}** vardiyasından (%{iyi['fire_orani']:.1f}) belirgin yüksek. "
+                f"{kotu['vardiya'].capitalize()} vardiyası aynı orana inseydi, bu kayıtların döneminde "
+                f"olası minimum **{vardiya_fark_tl:,.0f} TL** kurtarılırdı. Sebep aydınlatma, denetim eksikliği, "
+                f"yorgunluk veya usta farkı olabilir — sahada gözlemlemek gerekir."
+            )
+        else:
+            st.info("İki vardiyanın fire oranları birbirine yakın — belirgin bir vardiya sorunu görünmüyor.")
     st.markdown("---")
     if not bulundu:
         st.caption("Şu an güçlü bir çapraz bağlantı işareti bulunmadı. Veri arttıkça bu analiz güçlenir.")

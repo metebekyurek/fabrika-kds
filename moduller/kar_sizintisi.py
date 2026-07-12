@@ -21,9 +21,15 @@ def goster():
         return
 
     toplam = sum(k[1] for k in kalemler)
+    risk_detay, toplam_risk = hesap_motoru.stok_gecikme_riski()
 
-    st.metric("🔴 Toplam Sızıntı", f"{toplam:,.0f} TL",
-              help="Kayıtlı verilerden hesaplanan, önlenebilir kayıpların toplamı")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("🔴 Gerçekleşen Sızıntı", f"{toplam:,.0f} TL",
+              help="Kayıtlı verilerden hesaplanan, gerçekleşmiş önlenebilir kayıplar")
+    m2.metric("⚠️ Gecikme Riski", f"{toplam_risk:,.0f} TL",
+              help="Kritik stok + tedarik gecikmesi birleşirse oluşabilecek olası kayıp — henüz gerçekleşmedi")
+    m3.metric("💰 Toplam Maruziyet", f"{toplam + toplam_risk:,.0f} TL",
+              help="Gerçekleşen kayıp + açık risk. Patron gözüyle: 'masadaki toplam para'")
 
     for i, (ad, tutar, aciklama, modul) in enumerate(kalemler, 1):
         pay = (tutar / toplam * 100) if toplam > 0 else 0
@@ -34,7 +40,14 @@ def goster():
     en_buyuk = kalemler[0]
     st.error(f"🎯 **Önce buraya odaklan:** En büyük sızıntı **{en_buyuk[0]}** — {en_buyuk[1]:,.0f} TL. "
              f"Buradaki %20'lik bir iyileşme bile ~{en_buyuk[1]*0.2:,.0f} TL kazandırır.")
-
+        
+    if not risk_detay.empty:
+        st.markdown("---")
+        st.subheader("⚠️ Açık Riskler (henüz gerçekleşmedi)")
+        st.caption("Bunlar kayıp değil, önlem alınmazsa kayba dönüşebilecek durumlar. Erken sipariş bu riski sıfırlar.")
+        gosterim = risk_detay.copy()
+        gosterim.columns = ["Malzeme", "Kaç Gün Yeter", "Ort. Tedarik Gecikmesi (gün)", "Açıkta Kalınan Gün", "Risk (TL)"]
+        st.dataframe(gosterim, use_container_width=True, hide_index=True)    
     # --- Detaylı dökümler ---
     st.markdown("---")
     with st.expander("🔍 Detaylı döküm — hangi ürün / hangi makine?"):

@@ -142,15 +142,18 @@ def goster():
         st.info("ℹ️ Bu bir kıyaslamadır, alım emri değildir. Fiyat ile teslim riskini birlikte değerlendirip kararı sen verirsin.")
 
     st.markdown("---")
-    st.subheader("⏳ Sipariş Gecikme Maliyeti")
-    st.caption("Bir malzeme siparişi gecikirse üretim durur. Bu gecikme sana kaç TL'ye mal olur?")
+    st.subheader("⏳ Stok Gecikme Riski")
+    st.caption("Kritik stoklar + tedarikçi gecikmeleri birleşince oluşan risk. Elle giriş yok — sistem kendisi hesaplar.")
 
-    gm1, gm2, gm3 = st.columns(3)
-    gecikme_gun = gm1.number_input("Kaç gün gecikti / gecikecek?", min_value=0.0, value=3.0)
-    gunluk_uretim_kaybi = gm2.number_input("Günlük üretim kaybı (adet)", min_value=0.0, value=800.0)
-    parca_kar_gecikme = gm3.number_input("Parça başı kâr (TL)", min_value=0.0, value=2.0)
+    import hesap_motoru
+    risk_detay, toplam_risk = hesap_motoru.stok_gecikme_riski()
 
-    gecikme_maliyeti = gecikme_gun * gunluk_uretim_kaybi * parca_kar_gecikme
-
-    if gecikme_maliyeti > 0:
-        st.error(f"🔴 Bu gecikme sana olası minimum **{gecikme_maliyeti:,.0f} TL** kâr kaybettiriyor ({gecikme_gun:,.0f} gün × {gunluk_uretim_kaybi:,.0f} adet × {parca_kar_gecikme:,.0f} TL). Bir sonraki siparişte teslim güvenilirliği yüksek tedarikçiyi tercih etmek bu kaybı önleyebilir.")
+    if risk_detay.empty:
+        st.success("🟢 Şu an gecikme riski görünmüyor: kritik seviyede stok olsa bile, mevcut stoklar tedarikçi gecikme süresinden daha uzun dayanıyor. Yine de kritik seviyedeki malzemeler için siparişi geciktirme — bu hesap 'şimdi sipariş verilirse' varsayımıyla doğrudur.")
+    else:
+        st.metric("🔴 Toplam Gecikme Riski", f"{toplam_risk:,.0f} TL",
+                  help="Kritik stoklar bitip tedarik gecikirse oluşabilecek olası kayıp")
+        gosterim = risk_detay.copy()
+        gosterim.columns = ["Malzeme", "Kaç Gün Yeter", "Ort. Tedarik Gecikmesi (gün)", "Açıkta Kalınan Gün", "Risk (TL)"]
+        st.dataframe(gosterim, use_container_width=True, hide_index=True)
+        st.caption("ℹ️ Hesap: stok kaç gün yeter + tedarikçi ortalama gecikmesi = açıkta kalınan gün × fabrikanın günlük ortalama kârının %25'i (temkinli — tek malzeme tüm üretimi durdurmaz). Bu bir risk tahminidir, kesin kayıp değil. Erken sipariş bu riski sıfırlar.")

@@ -153,3 +153,117 @@ def sizinti_kalemleri():
 
     kalemler.sort(key=lambda x: x[1], reverse=True)
     return kalemler
+def vardiya_kiyasi():
+    """Gece/gündüz vardiya karşılaştırması — fire oranı farkını TL'ye çevirir.
+    Döner: (detay_df, aylik_fark_tl) veya (boş, 0)"""
+    uretim = veritabani.veri_oku("uretim")
+    karlar = urun_karlari()
+
+    gerekli = {"vardiya", "urun_kodu", "uretilen_adet", "fire_adet"}
+    if uretim.empty or not gerekli.issubset(uretim.columns) or not karlar:
+        return pd.DataFrame(), 0.0
+
+    u = uretim.copy()
+    u["urun_kodu"] = _temizle(u["urun_kodu"])
+    u["vardiya"] = u["vardiya"].astype(str).str.strip().str.lower()
+    u["uretilen_adet"] = pd.to_numeric(u["uretilen_adet"], errors="coerce").fillna(0)
+    u["fire_adet"] = pd.to_numeric(u["fire_adet"], errors="coerce").fillna(0)
+    u["parca_kar"] = u["urun_kodu"].map(karlar)
+    u = u.dropna(subset=["parca_kar"])
+    u = u[u["vardiya"].isin(["gündüz", "gece"])]
+
+    if u.empty or u["vardiya"].nunique() < 2:
+        return pd.DataFrame(), 0.0
+
+    u["fire_kaybi"] = u["fire_adet"] * u["parca_kar"]
+
+    ozet = u.groupby("vardiya").agg(
+        uretim=("uretilen_adet", "sum"),
+        fire=("fire_adet", "sum"),
+        fire_kaybi_tl=("fire_kaybi", "sum"),
+    ).reset_index()
+    ozet["fire_orani"] = ozet["fire"] / (ozet["uretim"] + ozet["fire"]) * 100
+
+    # Kötü vardiya iyi vardiyanın fire ORANINA inseydi, kaç TL kurtarırdı?
+    iyi = ozet.loc[ozet["fire_orani"].idxmin()]
+    kotu = ozet.loc[ozet["fire_orani"].idxmax()]
+    if kotu["fire"] > 0 and kotu["fire_orani"] > iyi["fire_orani"]:
+        hedef_fire = (kotu["uretim"] + kotu["fire"]) * iyi["fire_orani"] / 100
+        onlenebilir_adet = kotu["fire"] - hedef_fire
+        ort_kar = kotu["fire_kaybi_tl"] / kotu["fire"]
+        fark_tl = onlenebilir_adet * ort_kar
+    else:
+        fark_tl = 0.0
+
+    return ozet, float(fark_tl)
+def stok_gecikme_riski():
+    """Kritik seviyedeki stoklar için: 'stok biterse ve tedarik gecikirse kaç TL kayıp?' tahmini.
+    Mantık: kritik stok kaç gün yeter + tedarikçi ortalama gecikmesi = açıkta kalınan gün.
+    Açık gün × fabrikanın günlük ortalama üretim kâr kaybı = risk TL.
+    Döner: (detay_df, toplam_risk_tl)"""
+    stok = veritabani.veri_oku("stok")
+    tedarik = veritabani.veri_oku("tedarikciler")
+    uretim = veritabani.veri_oku("uretim")
+    karlar = urun_karlari()
+
+    gerekli = {"malzeme_adi", "mevcut_miktar", "kritik_seviye", "gunluk_tuketim"}
+    if stok.empty or not gerekli.issubset(stok.columns):
+        return pd.DataFrame(), 0.0
+
+    s = stok.copy()
+    for kol in ["mevcut_miktar", "kritik_seviye", "gunluk_tuketim"]:
+        s[kol] = pd.to_numeric(s[kol], errors="coerce")
+    s = s.dropna(subset=["mevcut_miktar", "kritik_seviye"])
+
+    # Sadece kritik seviyede/altında olanlar risk taşır
+    kritikler = s[s["mevcut_miktar"] <= s["kritik_seviye"]].copy()
+    if kritikler.empty:
+        return pd.DataFrame(), 0.0
+
+    # Tedarikçilerin genel ortalama gecikmesi (veri yoksa temkinli 3 gün varsay)
+    ort_gecikme = 3.0
+    if not tedarik.empty and "ortalama_gecikme_gun" in tedarik.columns:
+        g = pd.to_numeric(tedarik["ortalama_gecikme_gun"], errors="coerce").dropna()
+        if len(g) > 0:
+            ort_gecikme = float(g.mean())
+
+    # Fabrikanın günlük ortalama kâr üretimi (son kayıtlardan)
+    gunluk_kar = 0.0
+    if not uretim.empty and {"tarih", "urun_kodu", "uretilen_adet"}.issubset(uretim.columns) and karlar:
+        u = uretim.copy()
+        u["urun_kodu"] = _temizle(u["urun_kodu"])
+        u["uretilen_adet"] = pd.to_numeric(u["uretilen_adet"], errors="coerce").fillna(0)
+        u["parca_kar"] = u["urun_kodu"].map(karlar)
+        u = u.dropna(subset=["parca_kar"])
+        u["tarih"] = pd.to_datetime(u["tarih"], errors="coerce")
+        u = u.dropna(subset=["tarih"])
+        if not u.empty:
+            gun_sayisi = max((u["tarih"].max() - u["tarih"].min()).days, 1)
+            toplam_kar = (u["uretilen_adet"] * u["parca_kar"]).sum()
+            gunluk_kar = toplam_kar / gun_sayisi
+
+    if gunluk_kar <= 0:
+        return pd.DataFrame(), 0.0
+
+    kayitlar = []
+    for _, r in kritikler.iterrows():
+        gunluk_tuk = r["gunluk_tuketim"] if pd.notna(r["gunluk_tuketim"]) and r["gunluk_tuketim"] > 0 else None
+        kalan_gun = (r["mevcut_miktar"] / gunluk_tuk) if gunluk_tuk else 0
+        acik_gun = max(ort_gecikme - kalan_gun, 0)
+        # Temkinli varsayım: bu malzemenin bitmesi üretimin TAMAMINI değil,
+        # kabaca dörtte birini durdurur (tek malzeme her üretimi durdurmaz)
+        risk_tl = acik_gun * gunluk_kar * 0.25
+        if risk_tl > 0:
+            kayitlar.append({
+                "malzeme": r["malzeme_adi"],
+                "kalan_gun": round(kalan_gun, 1),
+                "tedarik_gecikme_gun": round(ort_gecikme, 1),
+                "acikta_kalinan_gun": round(acik_gun, 1),
+                "risk_tl": round(risk_tl, 0),
+            })
+
+    if not kayitlar:
+        return pd.DataFrame(), 0.0
+
+    detay = pd.DataFrame(kayitlar).sort_values("risk_tl", ascending=False)
+    return detay, float(detay["risk_tl"].sum())
