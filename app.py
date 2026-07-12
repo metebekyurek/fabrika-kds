@@ -1,112 +1,51 @@
 import streamlit as st
 import pandas as pd
-from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi, gunluk_ozet_mail, ayarlar, urunler, demo_veri   
-from doviz_seridi import doviz_seridi_goster
-from grafikler import uretim_trend_grafigi
+from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi, gunluk_ozet_mail, ayarlar, urunler, demo_veri, oee_analiz, gunun_ozeti
+
 st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
 
 st.sidebar.title("🏭 Fabrika KDS")
 st.sidebar.caption("Entegre Karar Destek Sistemi")
 
+MENU_GRUPLARI = {
+    "📊 GENEL BAKIŞ": ["Günün Özeti", "Kâr Sızıntısı", "Çapraz Zekâ", "Simülatör"],
+    "🏭 OPERASYON": ["Üretim", "OEE Analizi", "Bakım", "Bakım Takvimi", "Stok", "Enerji", "Finans"],
+    "📋 TANIMLAR": ["Makineler", "Ürünler", "Fabrika Ayarları"],
+    "📤 RAPOR & İLETİŞİM": ["PDF Rapor", "Günün Özeti Maili"],
+    "🔧 DİĞER": ["Demo Verisi"],
+}
 
-secim = st.sidebar.radio(
-    "Menü",
-["📊 Günün Özeti", "💸 Kâr Sızıntısı", "🧠 Çapraz Zekâ", "🎚️ Simülatör", "📄 PDF Rapor", "💰 Finans", "⚡ Enerji", "🔧 Üretim", "🛠️ Bakım", "📅 Bakım Takvimi", "📦 Stok", "⚙️ Makineler", "📧 Günün Özeti Maili", "⚙️ Fabrika Ayarları","📦 Ürünler", "🎬 Demo Verisi"])
-if secim == "📊 Günün Özeti":
-    import veritabani
-    veritabani.tablolari_olustur()
+if "aktif_sayfa" not in st.session_state:
+    st.session_state["aktif_sayfa"] = "Günün Özeti"
 
-    st.title("📊 Günün Özeti")
-    st.caption("Fabrikanızın bugünkü genel durumu — tek bakışta.")
+for grup, sayfalar in MENU_GRUPLARI.items():
+    st.sidebar.markdown(f"**{grup}**")
+    for sayfa in sayfalar:
+        if st.sidebar.button(sayfa, key=f"btn_{sayfa}", use_container_width=True,
+                             type="primary" if st.session_state["aktif_sayfa"] == sayfa else "secondary"):
+            st.session_state["aktif_sayfa"] = sayfa
+            st.rerun()
 
-    ariza_df = veritabani.veri_oku("arizalar")
-    uretim_df = veritabani.veri_oku("uretim")
-    stok_df = veritabani.veri_oku("stok")
-    enerji_df = veritabani.veri_oku("enerji")
+secim = st.session_state["aktif_sayfa"]
 
-    # Üst satır: 4 ana gösterge
-    k1, k2, k3, k4 = st.columns(4)
+SAYFALAR = {
+    "Günün Özeti": gunun_ozeti.goster,
+    "Kâr Sızıntısı": kar_sizintisi.goster,
+    "Çapraz Zekâ": capraz_zeka.goster,
+    "Simülatör": kar_simulatoru.goster,
+    "Üretim": uretim.goster,
+    "OEE Analizi": oee_analiz.goster,
+    "Bakım": bakim.goster,
+    "Bakım Takvimi": bakim_takvimi.goster,
+    "Stok": stok.goster,
+    "Enerji": enerji.goster,
+    "Finans": finans.goster,
+    "Makineler": makineler.goster,
+    "Ürünler": urunler.goster,
+    "Fabrika Ayarları": ayarlar.goster,
+    "PDF Rapor": pdf_rapor.goster,
+    "Günün Özeti Maili": gunluk_ozet_mail.goster,
+    "Demo Verisi": demo_veri.goster,
+}
 
-    # Bakım: kayıtlı arıza sayısı ve toplam tamir gideri
-    if not ariza_df.empty and "tamir_maliyeti_tl" in ariza_df.columns:
-        toplam_tamir = pd.to_numeric(ariza_df["tamir_maliyeti_tl"], errors="coerce").sum()
-        k1.metric("🛠️ Kayıtlı Arıza", f"{len(ariza_df)} adet", help="Bakım modülüne kaydedilen arıza sayısı")
-        k2.metric("💸 Toplam Tamir Gideri", f"{toplam_tamir:,.0f} TL")
-    else:
-        k1.metric("🛠️ Kayıtlı Arıza", "0 adet")
-        k2.metric("💸 Toplam Tamir Gideri", "0 TL")
-
-    # Üretim: toplam üretim ve fire oranı
-    if not uretim_df.empty and "uretilen_adet" in uretim_df.columns:
-        top_uretim = pd.to_numeric(uretim_df["uretilen_adet"], errors="coerce").sum()
-        top_fire = pd.to_numeric(uretim_df["fire_adet"], errors="coerce").sum()
-        fire_or = (top_fire / (top_uretim + top_fire) * 100) if (top_uretim + top_fire) > 0 else 0
-        k3.metric("🔧 Toplam Üretim", f"{top_uretim:,.0f} adet")
-        k4.metric("♻️ Fire Oranı", f"%{fire_or:,.1f}")
-    else:
-        k3.metric("🔧 Toplam Üretim", "0 adet")
-        k4.metric("♻️ Fire Oranı", "%0")
-    st.subheader("📈 Üretim Trendi")
-    uretim_trend_grafigi(uretim_df)
-    st.markdown("---")
-
-    # Kritik stok uyarıları
-    st.subheader("🚨 Dikkat Gerektirenler")
-    uyari_bulundu = False
-
-    if not stok_df.empty and "mevcut_miktar" in stok_df.columns:
-        for _, s in stok_df.iterrows():
-            mevcut = pd.to_numeric(s.get("mevcut_miktar"), errors="coerce")
-            kritik = pd.to_numeric(s.get("kritik_seviye"), errors="coerce")
-            if pd.notna(mevcut) and pd.notna(kritik) and mevcut <= kritik:
-                st.error(f"🔴 Stok: **{s['malzeme_adi']}** kritik seviyede ({mevcut:,.0f} kaldı). Sipariş zamanı.")
-                uyari_bulundu = True
-
-    if not ariza_df.empty:
-        st.warning(f"🟡 Bakım: {len(ariza_df)} kayıtlı arıza var. Detay ve önleyici bakım kararı için Bakım modülüne bak.")
-        uyari_bulundu = True
-
-    if not uyari_bulundu:
-        st.success("🟢 Şu an acil dikkat gerektiren bir durum görünmüyor.")
-
-    st.markdown("---")
-    st.info("💡 Detaylı analiz için sol menüden ilgili modüle girebilirsin. Bu özet, kaydettiğin verilerden otomatik oluşur.")
-    st.markdown("---")
-    st.subheader("💱 Güncel Kurlar")
-    doviz_seridi_goster()
-elif secim == "💰 Finans":
-    finans.goster()
-
-elif secim == "⚡ Enerji":
-    enerji.goster()
-
-elif secim == "🔧 Üretim":
-    uretim.goster()
-
-elif secim == "🛠️ Bakım":
-    bakim.goster()
-
-elif secim == "📦 Stok":
-    stok.goster()
-
-elif secim == "⚙️ Makineler":
-    makineler.goster()    
-
-elif secim == "💸 Kâr Sızıntısı":
-    kar_sizintisi.goster()
-elif secim == "🧠 Çapraz Zekâ":
-    capraz_zeka.goster()
-elif secim == "🎚️ Simülatör":
-    kar_simulatoru.goster()    
-elif secim == "📄 PDF Rapor":
-    pdf_rapor.goster()
-elif secim == "📅 Bakım Takvimi":
-    bakim_takvimi.goster()   
-elif secim == "📧 Günün Özeti Maili":
-    gunluk_ozet_mail.goster()
-elif secim == "⚙️ Fabrika Ayarları":
-    ayarlar.goster()
-elif secim == "📦 Ürünler":
-    urunler.goster()
-elif secim == "🎬 Demo Verisi":
-    demo_veri.goster()    
+SAYFALAR[secim]()
