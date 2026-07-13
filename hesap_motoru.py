@@ -267,3 +267,210 @@ def stok_gecikme_riski():
 
     detay = pd.DataFrame(kayitlar).sort_values("risk_tl", ascending=False)
     return detay, float(detay["risk_tl"].sum())
+def donem_kiyasi(gun_sayisi=30):
+    """Son X gün ile ondan önceki X günü kıyaslar.
+    Döner: {metrik_adi: (bu_donem, onceki_donem, degisim_yuzde)} sözlüğü."""
+    from datetime import datetime, timedelta
+
+    uretim = veritabani.veri_oku("uretim")
+    ariza = veritabani.veri_oku("arizalar")
+    karlar = urun_karlari()
+
+    bugun = datetime.now()
+    bu_baslangic = bugun - timedelta(days=gun_sayisi)
+    onceki_baslangic = bugun - timedelta(days=gun_sayisi * 2)
+
+    sonuc = {}
+
+    # --- Üretim & Fire ---
+    if not uretim.empty and {"tarih", "uretilen_adet", "fire_adet"}.issubset(uretim.columns):
+        u = uretim.copy()
+        u["tarih"] = pd.to_datetime(u["tarih"], errors="coerce")
+        u["uretilen_adet"] = pd.to_numeric(u["uretilen_adet"], errors="coerce").fillna(0)
+        u["fire_adet"] = pd.to_numeric(u["fire_adet"], errors="coerce").fillna(0)
+        u = u.dropna(subset=["tarih"])
+
+        bu = u[u["tarih"] >= bu_baslangic]
+        onceki = u[(u["tarih"] >= onceki_baslangic) & (u["tarih"] < bu_baslangic)]
+
+        sonuc["Üretim (adet)"] = (bu["uretilen_adet"].sum(), onceki["uretilen_adet"].sum())
+        sonuc["Fire (adet)"] = (bu["fire_adet"].sum(), onceki["fire_adet"].sum())
+
+        # Fire TL (ürün bazlı)
+        if karlar and "urun_kodu" in u.columns:
+            for df_, ad in [(bu, "bu"), (onceki, "on")]:
+                pass
+            def fire_tl(df_):
+                d = df_.copy()
+                d["urun_kodu"] = _temizle(d["urun_kodu"])
+                d["kar"] = d["urun_kodu"].map(karlar)
+                d = d.dropna(subset=["kar"])
+                return (d["fire_adet"] * d["kar"]).sum()
+            sonuc["Fire Kaybı (TL)"] = (fire_tl(bu), fire_tl(onceki))
+
+    # --- Tamir gideri & Duruş ---
+    if not ariza.empty and "ariza_baslangic" in ariza.columns:
+        a = ariza.copy()
+        a["bas"] = pd.to_datetime(a["ariza_baslangic"], errors="coerce")
+        a = a.dropna(subset=["bas"])
+        if "tamir_maliyeti_tl" in a.columns:
+            a["tamir"] = pd.to_numeric(a["tamir_maliyeti_tl"], errors="coerce").fillna(0)
+            bu_a = a[a["bas"] >= bu_baslangic]
+            onceki_a = a[(a["bas"] >= onceki_baslangic) & (a["bas"] < bu_baslangic)]
+            sonuc["Tamir Gideri (TL)"] = (bu_a["tamir"].sum(), onceki_a["tamir"].sum())
+            sonuc["Arıza Sayısı"] = (len(bu_a), len(onceki_a))
+        if "ariza_bitis" in a.columns:
+            a["bit"] = pd.to_datetime(a["ariza_bitis"], errors="coerce")
+            a2 = a.dropna(subset=["bit"])
+            a2["durus_saat"] = (a2["bit"] - a2["bas"]).dt.total_seconds() / 3600
+            bu_a = a2[a2["bas"] >= bu_baslangic]
+            onceki_a = a2[(a2["bas"] >= onceki_baslangic) & (a2["bas"] < bu_baslangic)]
+            sonuc["Duruş (saat)"] = (bu_a["durus_saat"].sum(), onceki_a["durus_saat"].sum())
+
+    # Yüzde değişimleri ekle
+    final = {}
+    for ad, (simdi, once) in sonuc.items():
+        if once > 0:
+            degisim = (simdi - once) / once * 100
+        elif simdi > 0:
+            degisim = 100.0
+        else:
+            degisim = 0.0
+        final[ad] = (float(simdi), float(once), float(degisim))
+
+    return final
+def takvim_ay_kiyasi():
+    """Takvim bazlı kıyas: bu ay (1'inden bugüne) ↔ geçen ayın tamamı.
+    Patron dilinde 'geçen ay' budur — kayan 30 gün değil."""
+    from datetime import datetime
+
+    bugun = datetime.now()
+    bu_ay_bas = bugun.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # Geçen ayın başı: bu ayın başından 1 gün geri git, o günün ayının 1'i
+    gecen_ay_son = bu_ay_bas - pd.Timedelta(days=1)
+    gecen_ay_bas = gecen_ay_son.replace(day=1)
+
+    uretim = veritabani.veri_oku("uretim")
+    ariza = veritabani.veri_oku("arizalar")
+    karlar = urun_karlari()
+
+    sonuc = {}
+
+    if not uretim.empty and {"tarih", "uretilen_adet", "fire_adet"}.issubset(uretim.columns):
+        u = uretim.copy()
+        u["tarih"] = pd.to_datetime(u["tarih"], errors="coerce")
+        u["uretilen_adet"] = pd.to_numeric(u["uretilen_adet"], errors="coerce").fillna(0)
+        u["fire_adet"] = pd.to_numeric(u["fire_adet"], errors="coerce").fillna(0)
+        u = u.dropna(subset=["tarih"])
+
+        bu = u[u["tarih"] >= bu_ay_bas]
+        onceki = u[(u["tarih"] >= gecen_ay_bas) & (u["tarih"] < bu_ay_bas)]
+
+        sonuc["Üretim (adet)"] = (bu["uretilen_adet"].sum(), onceki["uretilen_adet"].sum())
+        sonuc["Fire (adet)"] = (bu["fire_adet"].sum(), onceki["fire_adet"].sum())
+
+        if karlar and "urun_kodu" in u.columns:
+            def fire_tl(df_):
+                d = df_.copy()
+                d["urun_kodu"] = _temizle(d["urun_kodu"])
+                d["kar"] = d["urun_kodu"].map(karlar)
+                d = d.dropna(subset=["kar"])
+                return (d["fire_adet"] * d["kar"]).sum()
+            sonuc["Fire Kaybı (TL)"] = (fire_tl(bu), fire_tl(onceki))
+
+    if not ariza.empty and "ariza_baslangic" in ariza.columns:
+        a = ariza.copy()
+        a["bas"] = pd.to_datetime(a["ariza_baslangic"], errors="coerce")
+        a = a.dropna(subset=["bas"])
+        if "tamir_maliyeti_tl" in a.columns:
+            a["tamir"] = pd.to_numeric(a["tamir_maliyeti_tl"], errors="coerce").fillna(0)
+            bu_a = a[a["bas"] >= bu_ay_bas]
+            on_a = a[(a["bas"] >= gecen_ay_bas) & (a["bas"] < bu_ay_bas)]
+            sonuc["Tamir Gideri (TL)"] = (bu_a["tamir"].sum(), on_a["tamir"].sum())
+            sonuc["Arıza Sayısı"] = (len(bu_a), len(on_a))
+        if "ariza_bitis" in a.columns:
+            a["bit"] = pd.to_datetime(a["ariza_bitis"], errors="coerce")
+            a2 = a.dropna(subset=["bit"]).copy()
+            a2["durus_saat"] = (a2["bit"] - a2["bas"]).dt.total_seconds() / 3600
+            bu_a = a2[a2["bas"] >= bu_ay_bas]
+            on_a = a2[(a2["bas"] >= gecen_ay_bas) & (a2["bas"] < bu_ay_bas)]
+            sonuc["Duruş (saat)"] = (bu_a["durus_saat"].sum(), on_a["durus_saat"].sum())
+
+    final = {}
+    for ad, (simdi, once) in sonuc.items():
+        if once > 0:
+            degisim = (simdi - once) / once * 100
+        elif simdi > 0:
+            degisim = 100.0
+        else:
+            degisim = 0.0
+        final[ad] = (float(simdi), float(once), float(degisim))
+    return final
+def ozel_aralik_kiyasi(bas_tarih, bit_tarih):
+    """Kullanıcının takvimden seçtiği aralık ↔ aynı uzunlukta bir önceki aralık.
+    Örn: 1-15 Mart seçildiyse, önceki dönem 14-28 Şubat olur."""
+    from datetime import datetime, timedelta
+
+    bu_bas = pd.to_datetime(bas_tarih)
+    # Bitiş gününün TAMAMI dahil olsun diye 1 gün ekliyoruz
+    bu_bit = pd.to_datetime(bit_tarih) + pd.Timedelta(days=1)
+    uzunluk = bu_bit - bu_bas
+    on_bas = bu_bas - uzunluk
+    on_bit = bu_bas
+
+    uretim = veritabani.veri_oku("uretim")
+    ariza = veritabani.veri_oku("arizalar")
+    karlar = urun_karlari()
+
+    sonuc = {}
+
+    if not uretim.empty and {"tarih", "uretilen_adet", "fire_adet"}.issubset(uretim.columns):
+        u = uretim.copy()
+        u["tarih"] = pd.to_datetime(u["tarih"], errors="coerce")
+        u["uretilen_adet"] = pd.to_numeric(u["uretilen_adet"], errors="coerce").fillna(0)
+        u["fire_adet"] = pd.to_numeric(u["fire_adet"], errors="coerce").fillna(0)
+        u = u.dropna(subset=["tarih"])
+
+        bu = u[(u["tarih"] >= bu_bas) & (u["tarih"] < bu_bit)]
+        onceki = u[(u["tarih"] >= on_bas) & (u["tarih"] < on_bit)]
+
+        sonuc["Üretim (adet)"] = (bu["uretilen_adet"].sum(), onceki["uretilen_adet"].sum())
+        sonuc["Fire (adet)"] = (bu["fire_adet"].sum(), onceki["fire_adet"].sum())
+
+        if karlar and "urun_kodu" in u.columns:
+            def fire_tl(df_):
+                d = df_.copy()
+                d["urun_kodu"] = _temizle(d["urun_kodu"])
+                d["kar"] = d["urun_kodu"].map(karlar)
+                d = d.dropna(subset=["kar"])
+                return (d["fire_adet"] * d["kar"]).sum()
+            sonuc["Fire Kaybı (TL)"] = (fire_tl(bu), fire_tl(onceki))
+
+    if not ariza.empty and "ariza_baslangic" in ariza.columns:
+        a = ariza.copy()
+        a["bas"] = pd.to_datetime(a["ariza_baslangic"], errors="coerce")
+        a = a.dropna(subset=["bas"])
+        if "tamir_maliyeti_tl" in a.columns:
+            a["tamir"] = pd.to_numeric(a["tamir_maliyeti_tl"], errors="coerce").fillna(0)
+            bu_a = a[(a["bas"] >= bu_bas) & (a["bas"] < bu_bit)]
+            on_a = a[(a["bas"] >= on_bas) & (a["bas"] < on_bit)]
+            sonuc["Tamir Gideri (TL)"] = (bu_a["tamir"].sum(), on_a["tamir"].sum())
+            sonuc["Arıza Sayısı"] = (len(bu_a), len(on_a))
+        if "ariza_bitis" in a.columns:
+            a["bit"] = pd.to_datetime(a["ariza_bitis"], errors="coerce")
+            a2 = a.dropna(subset=["bit"]).copy()
+            a2["durus_saat"] = (a2["bit"] - a2["bas"]).dt.total_seconds() / 3600
+            bu_a = a2[(a2["bas"] >= bu_bas) & (a2["bas"] < bu_bit)]
+            on_a = a2[(a2["bas"] >= on_bas) & (a2["bas"] < on_bit)]
+            sonuc["Duruş (saat)"] = (bu_a["durus_saat"].sum(), on_a["durus_saat"].sum())
+
+    final = {}
+    for ad, (simdi, once) in sonuc.items():
+        if once > 0:
+            degisim = (simdi - once) / once * 100
+        elif simdi > 0:
+            degisim = 100.0
+        else:
+            degisim = 0.0
+        final[ad] = (float(simdi), float(once), float(degisim))
+    return final
