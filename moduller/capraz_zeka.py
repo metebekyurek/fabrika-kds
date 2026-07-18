@@ -136,24 +136,35 @@ def goster():
         o["deger"] = pd.to_numeric(o["deger"], errors="coerce")
         m_satir = makine_df[makine_df["makine_id"] == en_ariza_makine]
 
+        param_adlari = {"yag_sicakligi": "yağ sıcaklığı", "titresim": "titreşim", "motor_akimi": "motor akımı"}
+
         yakin_bulundu = False
         if not o.empty and not m_satir.empty:
-            for _, olcum in o.iterrows():
-                param = str(olcum.get("parametre", "")).strip()
-                deger = olcum.get("deger")
-                if param in sinir_haritasi and pd.notna(deger):
-                    sinir_kol = sinir_haritasi[param]
-                    if sinir_kol in m_satir.columns:
-                        sinir = pd.to_numeric(m_satir.iloc[0][sinir_kol], errors="coerce")
-                        if pd.notna(sinir) and sinir > 0 and deger >= sinir * 0.9:
-                            yakin_bulundu = True
-                            bulundu = True
-                            st.warning(
-                                f"⚠️ En çok arızalanan makine **{en_ariza_makine}**'in "
-                                f"**{param}** ölçümü ({deger:,.1f}), kritik sınıra ({sinir:,.0f}) "
-                                f"çok yakın. **Sensör, arızayı önceden haber veriyor olabilir** — "
-                                f"bu parametreyi düzenli izlemek erken müdahale sağlayabilir."
-                            )
+            yakin_parametreler = []
+            for param, sinir_kol in sinir_haritasi.items():
+                if sinir_kol not in m_satir.columns:
+                    continue
+                sinir = pd.to_numeric(m_satir.iloc[0][sinir_kol], errors="coerce")
+                if pd.isna(sinir) or sinir <= 0:
+                    continue
+                p_olcum = o[o["parametre"].astype(str).str.strip() == param]["deger"].dropna()
+                if p_olcum.empty:
+                    continue
+                en_kotu = float(p_olcum.max())
+                if en_kotu >= sinir * 0.9:
+                    yakin_parametreler.append((param_adlari.get(param, param), en_kotu, float(sinir)))
+
+            if yakin_parametreler:
+                yakin_bulundu = True
+                bulundu = True
+                detay = ", ".join(f"**{ad}** (ölçülen {d:,.1f} / sınır {s:,.0f})"
+                                  for ad, d, s in yakin_parametreler)
+                st.warning(
+                    f"⚠️ En çok arızalanan makine **{en_ariza_makine}**'in şu ölçümleri kritik sınıra "
+                    f"çok yakın: {detay}. **Sensör, arızayı önceden haber veriyor olabilir** — "
+                    f"bu parametreleri düzenli izlemek erken müdahale sağlayabilir."
+                )
+                            
         if not yakin_bulundu:
             st.info(
                 f"En çok arızalanan makine **{en_ariza_makine}**'in ölçümleri şu an kritik "

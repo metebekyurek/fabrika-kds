@@ -172,8 +172,43 @@ def _enerji():
         {"donem": "2026-03", "toplam_tuketim_kwh": 45200, "toplam_tutar_tl": 128820},
         {"donem": "2026-04", "toplam_tuketim_kwh": 46800, "toplam_tutar_tl": 138060},
         {"donem": "2026-05", "toplam_tuketim_kwh": 51300, "toplam_tutar_tl": 158010},
-        {"donem": "2026-06", "toplam_tuketim_kwh": 54700, "toplam_tutar_tl": 174 * 1000},
+        {"donem": "2026-06", "toplam_tuketim_kwh": 54700, "toplam_tutar_tl": 174000},
     ])
+
+def _olcumler():
+    """Sensör ölçümleri — son 3 gün. TRN-02 (en çok arızalanan) bilerek sınıra yakın."""
+    random.seed(11)
+    kayitlar = []
+    bugun = datetime.now()
+
+    # Makine sınırları (_makineler ile uyumlu): yağ °C, titreşim mm/s, akım A
+    sinirlar = {
+        "TRN-02": (70, 6.0, 18),
+        "PRES-03": (65, 5.0, 22),
+        "CNC-01": (65, 2.8, 45),
+        "LZR-02": (60, 2.5, 60),
+        "MTK-01": (72, 5.5, 12),
+    }
+
+    for gun_geri in range(3, 0, -1):
+        zaman = (bugun - timedelta(days=gun_geri)).replace(hour=10, minute=0)
+        zaman_str = zaman.strftime("%Y-%m-%d %H:%M")
+        for makine, (yag_max, tit_max, akim_max) in sinirlar.items():
+            if makine == "TRN-02":
+                # Sınırın %90-96'sı: kritik eşiğe yakın ama aşmamış — 'erken uyarı' hikayesi
+                yag = round(yag_max * random.uniform(0.90, 0.96), 1)
+                tit = round(tit_max * random.uniform(0.91, 0.96), 1)
+                akim = round(akim_max * random.uniform(0.80, 0.88), 1)
+            else:
+                # Sağlıklı bölge: sınırın %55-80'i
+                yag = round(yag_max * random.uniform(0.55, 0.80), 1)
+                tit = round(tit_max * random.uniform(0.55, 0.80), 1)
+                akim = round(akim_max * random.uniform(0.55, 0.80), 1)
+            kayitlar.append({"makine_id": makine, "zaman": zaman_str, "parametre": "yag_sicakligi", "deger": yag, "birim": "°C"})
+            kayitlar.append({"makine_id": makine, "zaman": zaman_str, "parametre": "titresim", "deger": tit, "birim": "mm/s"})
+            kayitlar.append({"makine_id": makine, "zaman": zaman_str, "parametre": "motor_akimi", "deger": akim, "birim": "A"})
+
+    return pd.DataFrame(kayitlar)
 
 def goster():
     st.title("🎬 Demo Verisi Yükle")
@@ -189,6 +224,7 @@ def goster():
     - 🛠️ **~45 arıza kaydı** (eski makineler daha çok bozuluyor)
     - 📦 **10 stok kalemi** (bazıları kritik seviyede)
     - ⚡ **6 aylık enerji faturası**
+    - 📡 **45 sensör ölçümü** (5 makine × 3 gün — biri kritik sınıra yakın seyrediyor)
     """)
 
     if st.button("🎬 Demo verisini yükle", type="primary"):
@@ -200,6 +236,7 @@ def goster():
             veritabani.veri_kaydet("arizalar", _arizalar())
             veritabani.veri_kaydet("stok", _stok())
             veritabani.veri_kaydet("enerji", _enerji())
+            veritabani.veri_kaydet("olcumler", _olcumler())
         st.success("✅ Demo verisi yüklendi! Artık tüm modüllerde dolu, gerçekçi veri var.")
         st.info("💡 Şimdi **💸 Kâr Sızıntısı**, **🎚️ Simülatör** ve **📄 PDF Rapor** sayfalarına bak — rakamlar gerçek bir fabrika ölçeğinde olacak.")
         st.balloons()
