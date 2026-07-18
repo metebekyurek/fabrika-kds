@@ -1,111 +1,171 @@
 import streamlit as st
-from datetime import datetime
+import pandas as pd
+import os
+from datetime import datetime, timedelta
 from fpdf import FPDF
+import veritabani
 import hesap_motoru
 from moduller import ayarlar
 
+# Font dosyalarının yolu: proje kökündeki fontlar/ klasörü
+FONT_KLASORU = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fontlar")
+
+TURKCE_FONT_VAR = False  # rapor_olustur içinde güncellenir
+ANA_FONT = "Helvetica"   # rapor_olustur içinde güncellenir
+
+def _fontlari_yukle(pdf):
+    """DejaVu fontlarını PDF'e kaydeder. Dosyalar yoksa False döner (Helvetica'ya düşülür)."""
+    normal = os.path.join(FONT_KLASORU, "DejaVuSans.ttf")
+    kalin = os.path.join(FONT_KLASORU, "DejaVuSans-Bold.ttf")
+    if not (os.path.exists(normal) and os.path.exists(kalin)):
+        return False
+    pdf.add_font("DejaVu", "", normal)
+    pdf.add_font("DejaVu", "B", kalin)
+    return True
+
 def _tr(metin):
-    """fpdf2'nin standart fontu bazı Türkçe karakterleri basamaz; en yakın harfe çevirir."""
+    """DejaVu varken dokunmadan döner; yoksa Türkçe karakterleri en yakın harfe çevirir."""
     if metin is None:
         return ""
     donusum = str(metin)
+    if TURKCE_FONT_VAR:
+        return donusum
     cevir = {"ı": "i", "İ": "I", "ş": "s", "Ş": "S", "ğ": "g", "Ğ": "G",
              "ç": "c", "Ç": "C", "ö": "o", "Ö": "O", "ü": "u", "Ü": "U",
              "â": "a", "î": "i", "û": "u"}
     for eski, yeni in cevir.items():
         donusum = donusum.replace(eski, yeni)
-    # Emojileri temizle (PDF fontu basamaz)
     return "".join(k for k in donusum if ord(k) < 256)
 
-def rapor_olustur(firma_adi):
-    """Kâr sızıntısı özetini tek sayfalık PDF olarak üretir, bytes döner."""
-    kalemler = hesap_motoru.sizinti_kalemleri()
-    toplam = sum(k[1] for k in kalemler)
+def _baslik(pdf, metin):
+    pdf.ln(4)
+    pdf.set_font(ANA_FONT, "B", 12)
+    pdf.cell(0, 8, _tr(metin), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font(ANA_FONT, "", 10)
+
+def rapor_olustur(firma_adi, gun_araligi, bolumler):
+    """Seçilen dönem ve bölümlerle PDF üretir, bytes döner."""
+    global TURKCE_FONT_VAR, ANA_FONT
+
+    baslangic = datetime.now() - timedelta(days=gun_araligi)
 
     pdf = FPDF()
+
+    TURKCE_FONT_VAR = _fontlari_yukle(pdf)
+    ANA_FONT = "DejaVu" if TURKCE_FONT_VAR else "Helvetica"
+
     pdf.add_page()
 
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 12, _tr("Kar Sizintisi Raporu"), new_x="LMARGIN", new_y="NEXT")
-
-    pdf.set_font("Helvetica", "", 11)
+    # --- Başlık ---
+    pdf.set_font(ANA_FONT, "B", 18)
+    pdf.cell(0, 12, _tr("Fabrika Durum Raporu"), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font(ANA_FONT, "", 11)
     pdf.set_text_color(90, 90, 90)
     pdf.cell(0, 7, _tr(f"Firma: {firma_adi}"), new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 7, _tr(f"Tarih: {datetime.now().strftime('%d.%m.%Y %H:%M')}"), new_x="LMARGIN", new_y="NEXT")
+    donem_adi = {1: "Günlük", 7: "Haftalık", 30: "Aylık"}.get(gun_araligi, f"Son {gun_araligi} gün")
+    pdf.cell(0, 7, _tr(f"Kapsam: {donem_adi} ({baslangic.strftime('%d.%m.%Y')} - {datetime.now().strftime('%d.%m.%Y')})"), new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(0, 0, 0)
-    pdf.ln(6)
+    pdf.ln(4)
 
-    pdf.set_font("Helvetica", "B", 14)
+    # --- Sızıntı özeti (her raporda olur — ana mesaj) ---
+    kalemler = hesap_motoru.sizinti_kalemleri()
+    toplam = sum(k[1] for k in kalemler)
+    pdf.set_font(ANA_FONT, "B", 14)
     pdf.set_fill_color(230, 57, 70)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 12, _tr(f"  Toplam Onlenebilir Sizinti: {toplam:,.0f} TL"), new_x="LMARGIN", new_y="NEXT", fill=True)
+    pdf.cell(0, 12, _tr(f"  Toplam Önlenebilir Sızıntı: {toplam:,.0f} TL"), new_x="LMARGIN", new_y="NEXT", fill=True)
     pdf.set_text_color(0, 0, 0)
-    pdf.ln(8)
+    pdf.set_font(ANA_FONT, "", 10)
 
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, _tr("Sizinti Kalemleri (buyukten kucuge):"), new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-
-    pdf.set_font("Helvetica", "", 11)
-    if kalemler:
+    if "Sızıntı kalemleri" in bolumler and kalemler:
+        _baslik(pdf, "Sızıntı Kalemleri (büyükten küçüğe)")
         for i, (ad, tutar, aciklama, modul) in enumerate(kalemler, 1):
             pay = (tutar / toplam * 100) if toplam > 0 else 0
-            pdf.cell(0, 7, _tr(f"{i}. {ad}: {tutar:,.0f} TL  (%{pay:.0f})"), new_x="LMARGIN", new_y="NEXT")
-            pdf.set_font("Helvetica", "I", 9)
-            pdf.set_text_color(120, 120, 120)
-            pdf.cell(0, 5, _tr(f"     {aciklama}"), new_x="LMARGIN", new_y="NEXT")
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_font("Helvetica", "", 11)
-            pdf.ln(2)
-    else:
-        pdf.cell(0, 8, _tr("Henuz hesaplanacak sizinti verisi yok."), new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 6, _tr(f"{i}. {ad}: {tutar:,.0f} TL (%{pay:.0f})"), new_x="LMARGIN", new_y="NEXT")
 
-    # Detay: fire ürün bazında
-    fire_tl, fire_detay = hesap_motoru.fire_kaybi_tl()
-    if not fire_detay.empty:
-        pdf.ln(4)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 7, _tr("Fire kaybi - urun bazinda:"), new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("Helvetica", "", 10)
-        for _, r in fire_detay.iterrows():
-            pdf.cell(0, 6, _tr(f"   {r['urun_kodu']}: {r['fire_adet']:,.0f} adet = {r['kayip_tl']:,.0f} TL"),
-                     new_x="LMARGIN", new_y="NEXT")
+    if "Fire dökümü" in bolumler:
+        fire_tl, fire_detay = hesap_motoru.fire_kaybi_tl()
+        if not fire_detay.empty:
+            _baslik(pdf, "Fire Kaybı — Ürün Bazında")
+            for _, r in fire_detay.iterrows():
+                pdf.cell(0, 6, _tr(f"   {r['urun_kodu']}: {r['fire_adet']:,.0f} adet = {r['kayip_tl']:,.0f} TL"), new_x="LMARGIN", new_y="NEXT")
 
-    # Detay: duruş makine bazında
-    durus_tl, durus_detay = hesap_motoru.durus_kaybi_tl()
-    if not durus_detay.empty:
-        pdf.ln(4)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 7, _tr("Durus kaybi - makine bazinda:"), new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("Helvetica", "", 10)
-        for _, r in durus_detay.iterrows():
-            pdf.cell(0, 6, _tr(f"   {r['makine_id']}: {r['durus_saat']:,.1f} saat durus = {r['kayip_tl']:,.0f} TL"),
-                     new_x="LMARGIN", new_y="NEXT")
+    if "Duruş dökümü" in bolumler:
+        durus_tl, durus_detay = hesap_motoru.durus_kaybi_tl()
+        if not durus_detay.empty:
+            _baslik(pdf, "Duruş Kaybı — Makine Bazında")
+            for _, r in durus_detay.iterrows():
+                pdf.cell(0, 6, _tr(f"   {r['makine_id']}: {r['durus_saat']:,.1f} saat = {r['kayip_tl']:,.0f} TL"), new_x="LMARGIN", new_y="NEXT")
 
+    if "Bakım durumu" in bolumler:
+        makine_df = veritabani.veri_oku("makineler")
+        if not makine_df.empty and "son_bakim_tarihi" in makine_df.columns:
+            _baslik(pdf, "Bakım Durumu")
+            bugun = datetime.now().date()
+            for _, m in makine_df.iterrows():
+                son = pd.to_datetime(m.get("son_bakim_tarihi"), errors="coerce")
+                periyot = pd.to_numeric(m.get("bakim_periyodu_gun"), errors="coerce")
+                if pd.isna(son) or pd.isna(periyot) or periyot <= 0:
+                    continue
+                sonraki = son.date() + timedelta(days=int(periyot))
+                kalan = (sonraki - bugun).days
+                mid = str(m.get("makine_id", "")).strip()
+                if kalan < 0:
+                    pdf.set_text_color(230, 57, 70)
+                    pdf.cell(0, 6, _tr(f"   {mid}: bakım {abs(kalan)} gün GECİKTİ"), new_x="LMARGIN", new_y="NEXT")
+                    pdf.set_text_color(0, 0, 0)
+                elif kalan <= 14:
+                    pdf.cell(0, 6, _tr(f"   {mid}: bakıma {kalan} gün kaldı"), new_x="LMARGIN", new_y="NEXT")
+
+    if "Kritik stoklar" in bolumler:
+        stok_df = veritabani.veri_oku("stok")
+        if not stok_df.empty and {"malzeme_adi", "mevcut_miktar", "kritik_seviye"}.issubset(stok_df.columns):
+            s = stok_df.copy()
+            s["mevcut_miktar"] = pd.to_numeric(s["mevcut_miktar"], errors="coerce")
+            s["kritik_seviye"] = pd.to_numeric(s["kritik_seviye"], errors="coerce")
+            kritik = s[s["mevcut_miktar"] <= s["kritik_seviye"]].dropna(subset=["mevcut_miktar"])
+            if not kritik.empty:
+                _baslik(pdf, "Kritik Stoklar")
+                for _, r in kritik.iterrows():
+                    pdf.cell(0, 6, _tr(f"   {r['malzeme_adi']}: {r['mevcut_miktar']:,.0f} kaldı (kritik: {r['kritik_seviye']:,.0f}) — SİPARİŞ ZAMANI"), new_x="LMARGIN", new_y="NEXT")
+
+    # --- Alt not ---
     pdf.ln(8)
-    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_font(ANA_FONT, "", 8)
     pdf.set_text_color(120, 120, 120)
     pdf.multi_cell(0, 5, _tr(
-        "Bu tutarlar kayitli verilerden hesaplanan olasi minimum kayiplardir; kesin muhasebe "
-        "rakami degildir. Her fire kendi urununun kariyla, her durus o makinenin kendi kapasitesi "
-        "ve gercekte bastigi urun karisimiyla hesaplanmistir. Fabrika KDS tarafindan otomatik uretilmistir."
+        "Bu tutarlar kayıtlı verilerden hesaplanan olası minimum kayıplardır; kesin muhasebe rakamı değildir. "
+        "Fabrika KDS tarafından otomatik üretilmiştir."
     ))
 
     return bytes(pdf.output())
 
 def goster():
     st.title("📄 PDF Rapor")
-    st.caption("Kâr sızıntısı özetini tek sayfalık, paylaşılabilir bir PDF'e dök. Ziyaretten sonra masada kalan somut çıktı.")
+    st.caption("Raporunu kendin tasarla: dönemi seç, hangi bölümler girsin işaretle, indir.")
 
     mevcut_ayar = ayarlar.ayarlari_oku()
-    firma = st.text_input("Firma adı (raporda görünecek)", value=mevcut_ayar["firma_adi"])
-    st.caption("💡 Firma adını ⚙️ Fabrika Ayarları'ndan kalıcı olarak değiştirebilirsin.")
+    firma = st.text_input("Firma adı", value=mevcut_ayar["firma_adi"])
 
-    if st.button("📄 Raporu oluştur"):
+    st.markdown("**📅 Rapor dönemi:**")
+    donem = st.radio("donem", ["Günlük", "Haftalık", "Aylık"], horizontal=True, index=2,
+                     label_visibility="collapsed")
+    gun_araligi = {"Günlük": 1, "Haftalık": 7, "Aylık": 30}[donem]
+
+    st.markdown("**📋 Rapora girecek bölümler:**")
+    b1, b2 = st.columns(2)
+    bolumler = []
+    if b1.checkbox("Sızıntı kalemleri", value=True): bolumler.append("Sızıntı kalemleri")
+    if b1.checkbox("Fire dökümü (ürün bazında)", value=True): bolumler.append("Fire dökümü")
+    if b1.checkbox("Duruş dökümü (makine bazında)", value=True): bolumler.append("Duruş dökümü")
+    if b2.checkbox("Bakım durumu (geciken/yaklaşan)", value=True): bolumler.append("Bakım durumu")
+    if b2.checkbox("Kritik stoklar", value=True): bolumler.append("Kritik stoklar")
+
+    if st.button("📄 Raporu oluştur", type="primary"):
         try:
-            pdf_bytes = rapor_olustur(firma)
-            st.success("✅ Rapor hazır! Aşağıdaki butondan indir.")
-            dosya_adi = f"kar_sizintisi_raporu_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+            pdf_bytes = rapor_olustur(firma, gun_araligi, bolumler)
+            st.success("✅ Rapor hazır!")
+            dosya_adi = f"fabrika_raporu_{donem.lower()}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
             st.download_button("⬇️ PDF'i indir", data=pdf_bytes, file_name=dosya_adi, mime="application/pdf")
         except Exception as e:
             st.error(f"❌ Rapor oluşturulamadı: {e}")
