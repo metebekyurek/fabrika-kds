@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import veritabani
+import excel_araclari 
 
 def goster():
     st.title("📦 Ürünler — Parça Kârı Tanımları")
@@ -14,7 +15,7 @@ def goster():
         {"urun_kodu": "URN-A", "urun_adi": "Sac braket", "parca_kar_tl": 2.0},
         {"urun_kodu": "URN-B", "urun_adi": "Lazer kesim panel", "parca_kar_tl": 5.5},
     ])
-
+    excel_araclari.sablon_butonu(ornek_veri, "urun_sablonu.xlsx") 
     yuklenen = st.file_uploader("📁 Veya Excel dosyası yükle (.xlsx)", type=["xlsx"], key="urun_excel")
 
     if yuklenen is not None:

@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import veritabani
+import excel_araclari 
 from grafikler import stok_grafigi
 
 
@@ -21,7 +22,7 @@ def goster():
     st.caption("Tabloyu düzenle, 'Kaydet'e bas — veriler kalıcı olur. Günlük tüketim girersen 'kaç gün yeter' hesaplanır.")
 
     veritabani.tablolari_olustur()
-
+    excel_araclari.sablon_butonu(ornek_veri, "stok_sablonu.xlsx")     
     yuklenen = st.file_uploader("📁 Veya Excel dosyası yükle (.xlsx)", type=["xlsx"], key="stok_excel")
 
     if yuklenen is not None:

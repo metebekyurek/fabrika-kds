@@ -1,3 +1,4 @@
+import excel_araclari
 import streamlit as st
 import pandas as pd
 import veritabani
@@ -23,7 +24,7 @@ def goster():
     st.caption("Tabloyu düzenle, satır ekle/sil, sonra 'Kaydet'e bas — veriler kalıcı olur.")
 
     veritabani.tablolari_olustur()
-
+    excel_araclari.sablon_butonu(ornek_veri, "uretim_sablonu.xlsx")
     yuklenen = st.file_uploader("📁 Veya Excel dosyası yükle (.xlsx)", type=["xlsx"], key="uretim_excel")
 
     if yuklenen is not None:
@@ -43,6 +44,15 @@ def goster():
     for yeni_kolon in ["planlanan_sure_dk", "durus_dk", "ideal_hiz_adet_dk"]:
         if yeni_kolon not in baslangic_veri.columns:
             baslangic_veri[yeni_kolon] = None
+    # Tanımlı makine ve ürün listeleri — dropdown için (yazım hatasını önler)
+    makine_listesi = []
+    urun_listesi = []
+    kayitli_makineler = veritabani.veri_oku("makineler")
+    if not kayitli_makineler.empty and "makine_id" in kayitli_makineler.columns:
+        makine_listesi = sorted(kayitli_makineler["makine_id"].astype(str).str.strip().unique().tolist())
+    kayitli_urunler = veritabani.veri_oku("urunler")
+    if not kayitli_urunler.empty and "urun_kodu" in kayitli_urunler.columns:
+        urun_listesi = sorted(kayitli_urunler["urun_kodu"].astype(str).str.strip().unique().tolist())        
     df = st.data_editor(
         baslangic_veri,
         num_rows="dynamic",
@@ -50,9 +60,12 @@ def goster():
         column_config={
             "tarih": "Tarih",
             "vardiya": st.column_config.SelectboxColumn("Vardiya", options=["gündüz", "gece", "tam gün"]),
-            "makine_id": "Makine",
+            "makine_id": st.column_config.SelectboxColumn("Makine", options=makine_listesi,
+                                                          help="⚙️ Makineler sayfasında tanımlı olanlardan seç"),
+            "urun_kodu": st.column_config.SelectboxColumn("Ürün", options=urun_listesi,
+                                                          help="📦 Ürünler sayfasında tanımlı olanlardan seç"),
             "operator_id": "Operatör",
-            "urun_kodu": "Ürün",
+            
             "hedef_adet": st.column_config.NumberColumn("Hedef", format="%d"),
             "uretilen_adet": st.column_config.NumberColumn("Üretilen", format="%d"),
             "fire_adet": st.column_config.NumberColumn("Fire", format="%d"),

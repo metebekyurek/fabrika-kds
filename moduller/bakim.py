@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import veritabani
 import hesap_motoru 
+import excel_araclari
 import mqtt_dinleyici
 from grafikler import bakim_grafigi
 
 def goster():
-    st.title("🛠️ Bakım — Kestirimci Bakım Merkezi")
-    st.caption("Arıza kayıtlarından MTBF, duruş maliyeti ve kök neden analizi. Elle giriş veya Excel.")
+    st.title("🛠️ Bakım — Arıza Takibi ve Önleyici Bakım")
+    st.caption("Arıza kayıtlarından arıza sıklığı, duruş maliyeti ve kök neden analizi. Elle giriş veya Excel.")
     # === CANLI SENSÖR AKIŞI (MQTT) ===
     with st.expander("📡 Canlı Sensör Akışı (MQTT) — tıkla aç/kapa", expanded=False):
         if "mqtt_basladi" not in st.session_state:
@@ -61,7 +62,8 @@ def goster():
 
     veritabani.tablolari_olustur()
 
-    # Excel'den yükleme — tablo çizilmeden ÖNCE karar veriyoruz
+    # Excel'den yükleme — tablo çizilmeden ÖNCE karar veriyoruz 
+    excel_araclari.sablon_butonu(ornek_veri, "ariza_sablonu.xlsx") 
     yuklenen = st.file_uploader("📁 Veya Excel dosyası yükle (.xlsx)", type=["xlsx"], key="bakim_excel")
 
     if yuklenen is not None:
@@ -118,7 +120,7 @@ def goster():
     g2.metric("Toplam Duruş", f"{toplam_durus:,.1f} saat")
     g3.metric("Makine Sayısı", f"{len(makineler)}")
 
-    st.markdown("**Makine Bazında MTBF (Arızalar Arası Ortalama Süre)**")
+    st.markdown("**Makine Bazında Arıza Sıklığı** (her makine ortalama kaç günde bir arızalanıyor?)")
     for makine in makineler:
         m_veri = gecerli[gecerli["makine_id"] == makine].sort_values("baslangic_dt")
         if len(m_veri) < 2:
@@ -205,7 +207,7 @@ def goster():
         {"makine_id": "CNC-01", "zaman": "2026-07-08 10:00", "parametre": "yag_sicakligi", "deger": 60, "birim": "°C"},
         {"makine_id": "CNC-01", "zaman": "2026-07-08 10:00", "parametre": "titresim", "deger": 3.5, "birim": "mm/s"},
     ])
-
+    excel_araclari.sablon_butonu(olcum_ornek, "olcum_sablonu.xlsx", "📥 Boş ölçüm şablonunu indir") 
     olcum_yuklenen = st.file_uploader("📁 Ölçüm Excel'i yükle (.xlsx)", type=["xlsx"], key="olcum_excel")
     if olcum_yuklenen is not None:
         try:

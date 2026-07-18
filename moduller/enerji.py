@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import veritabani
+import excel_araclari 
 from grafikler import enerji_grafigi
 from moduller import ayarlar 
 
@@ -24,7 +25,7 @@ def goster():
     st.caption("Faturalarını gir, 'Kaydet'e bas — veriler kalıcı olur. Sistem tüketim desenini öğrenip gelecek faturayı tahmin eder.")
 
     veritabani.tablolari_olustur()
-
+    excel_araclari.sablon_butonu(ornek_veri, "enerji_sablonu.xlsx") 
     yuklenen = st.file_uploader("📁 Veya Excel dosyası yükle (.xlsx)", type=["xlsx"], key="enerji_excel")
 
     if yuklenen is not None:

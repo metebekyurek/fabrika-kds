@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import veritabani
+import excel_araclari 
 
 
 def goster():
@@ -27,6 +28,7 @@ def goster():
 
     veritabani.tablolari_olustur()
 
+    excel_araclari.sablon_butonu(ornek_veri, "makine_sablonu.xlsx") 
     yuklenen = st.file_uploader("📁 Veya Excel dosyası yükle (.xlsx)", type=["xlsx"], key="makine_excel")
 
     if yuklenen is not None:
