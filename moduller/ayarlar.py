@@ -6,6 +6,9 @@ import veritabani
 VARSAYILAN = {
     "firma_adi": "Fabrikam",
     "yonetici_mail": "",
+    "tarife_gunduz": "2.85",
+    "tarife_puant": "4.20",
+    "tarife_gece": "1.60",
 }
 
 def ayarlari_oku():
@@ -40,11 +43,25 @@ def goster():
                           help="Raporlarda ve maillerde görünecek isim")
     yonetici_mail = st.text_input("Yönetici e-posta adresi", value=mevcut["yonetici_mail"],
                                   help="Günün özeti maili buraya gönderilecek")
+    st.markdown("---")
+    st.markdown("**⚡ Elektrik Tarife Fiyatları (TL/kWh)**")
+    st.caption("Elektrik faturandaki üç zamanlı tarife fiyatlarını bir kez gir — Enerji sayfası buradan okur. "
+               "Fatura değişince burayı güncellemen yeterli.")
 
+    t1, t2, t3 = st.columns(3)
+    tarife_gunduz = t1.number_input("Gündüz (06-17)", min_value=0.0,
+                                    value=float(mevcut["tarife_gunduz"]), step=0.05, format="%.2f")
+    tarife_puant = t2.number_input("Puant / akşam (17-22)", min_value=0.0,
+                                   value=float(mevcut["tarife_puant"]), step=0.05, format="%.2f")
+    tarife_gece = t3.number_input("Gece (22-06)", min_value=0.0,
+                                  value=float(mevcut["tarife_gece"]), step=0.05, format="%.2f")
     if st.button("💾 Ayarları kaydet"):
         yeni = pd.DataFrame([{
             "firma_adi": firma,
             "yonetici_mail": yonetici_mail,
+            "tarife_gunduz": str(tarife_gunduz),
+            "tarife_puant": str(tarife_puant),
+            "tarife_gece": str(tarife_gece),
         }])
         veritabani.veri_kaydet("ayarlar", yeni)
-        st.success("✅ Ayarlar kaydedildi!")
+        st.success("✅ Ayarlar kaydedildi!") 

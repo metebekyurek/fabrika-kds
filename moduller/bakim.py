@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import veritabani
+import hesap_motoru 
 import mqtt_dinleyici
 from grafikler import bakim_grafigi
 
@@ -133,24 +134,38 @@ def goster():
     
     st.markdown("---")
     st.subheader("💰 Duruş Maliyeti (Fırsat Maliyeti)")
-    st.caption("Makine durunca sadece tamir değil, üretilemeyen parça da kayıptır. Asıl zarar budur.")
+    st.caption("Makine durunca sadece tamir değil, üretilemeyen parça da kayıptır. "
+               "Her makine KENDİ kapasitesi ve KENDİ ürün karışımının kârıyla hesaplanır — Kâr Sızıntısı sayfasıyla aynı motor.")
 
-    m1, m2 = st.columns(2)
-    saatlik_uretim = m1.number_input("Bu makine saatte kaç parça üretir?", min_value=0.0, value=100.0)
-    parca_kar = m2.number_input("Parça başı kâr (TL)", min_value=0.0, value=2.0)
-
-    kacan_kar = toplam_durus * saatlik_uretim * parca_kar
-    toplam_tamir = gecerli["tamir_maliyeti_tl"].sum()
+    kacan_kar, durus_detay = hesap_motoru.durus_kaybi_tl()
+    toplam_tamir = float(pd.to_numeric(gecerli["tamir_maliyeti_tl"], errors="coerce").fillna(0).sum())
     gercek_zarar = kacan_kar + toplam_tamir
 
     st.markdown("**Arızaların Gerçek Bedeli**")
     z1, z2, z3 = st.columns(3)
-    z1.metric("Kaçan Üretim Kârı", f"{kacan_kar:,.0f} TL", help="Duruş saati × saatlik üretim × parça kârı")
+    z1.metric("Kaçan Üretim Kârı", f"{kacan_kar:,.0f} TL",
+              help="Her makine: duruş saati × kendi kapasitesi × kendi ürün karışımının ortalama kârı")
     z2.metric("Toplam Tamir Gideri", f"{toplam_tamir:,.0f} TL")
     z3.metric("Toplam Gerçek Zarar", f"{gercek_zarar:,.0f} TL", delta_color="inverse")
 
-    st.error(f"🔴 Bu arızalar sana toplam **{gercek_zarar:,.0f} TL**'ye mal oldu. Bunun {kacan_kar:,.0f} TL'si duran üretimden, {toplam_tamir:,.0f} TL'si tamirden.")
-
+    if kacan_kar > 0:
+        st.error(f"🔴 Bu arızalar sana toplam **{gercek_zarar:,.0f} TL**'ye mal oldu. "
+                 f"Bunun {kacan_kar:,.0f} TL'si duran üretimden, {toplam_tamir:,.0f} TL'si tamirden.")
+        st.markdown("**Makine Bazında Duruş Kaybı**")
+        gosterim = durus_detay.rename(columns={
+            "makine_id": "Makine",
+            "durus_saat": "Duruş (saat)",
+            "kapasite": "Kapasite (adet/saat)",
+            "agirlikli_kar": "Ort. Parça Kârı (TL)",
+            "kayip_tl": "Kaçan Kâr (TL)",
+        })
+        gosterim["Duruş (saat)"] = gosterim["Duruş (saat)"].round(1)
+        gosterim["Ort. Parça Kârı (TL)"] = gosterim["Ort. Parça Kârı (TL)"].round(2)
+        gosterim["Kaçan Kâr (TL)"] = gosterim["Kaçan Kâr (TL)"].round(0)
+        st.dataframe(gosterim, use_container_width=True, hide_index=True)
+    else:
+        st.warning("⚠️ Duruş kaybı hesaplanamadı. Bunun için: **Makineler** sayfasında saatlik kapasite, "
+                   "**Ürünler** sayfasında parça kârı tanımlı olmalı ve arıza kayıtları **kaydedilmiş** olmalı.")  
     st.markdown("---")
     st.subheader("🔮 Kök Neden ve Önleyici Bakım")
     st.caption("Geçmişe bakıp geleceği uyarır: bir sonraki arıza ne zaman, önlem almak mantıklı mı?")
@@ -205,13 +220,17 @@ def goster():
             olcum_baslangic = olcum_ornek
         else:
             olcum_baslangic = olcum_kayitli.drop(columns=["id"]) if "id" in olcum_kayitli.columns else olcum_kayitli
-
+    makine_listesi = []
+    kayitli_makineler = veritabani.veri_oku("makineler")
+    if not kayitli_makineler.empty and "makine_id" in kayitli_makineler.columns:
+        makine_listesi = sorted(kayitli_makineler["makine_id"].astype(str).str.strip().unique().tolist())
     olcum_df = st.data_editor(
         olcum_baslangic,
         num_rows="dynamic",
         use_container_width=True,
         column_config={
-            "makine_id": "Makine",
+            "makine_id": st.column_config.SelectboxColumn("Makine", options=makine_listesi,
+                                                          help="⚙️ Makineler sayfasında tanımlı olanlardan seç"),
             "zaman": "Zaman",
             "parametre": st.column_config.SelectboxColumn("Parametre", options=["titresim", "yag_sicakligi", "motor_sicakligi", "motor_akimi", "basinc", "devir"]),
             "deger": st.column_config.NumberColumn("Değer", format="%.1f"),

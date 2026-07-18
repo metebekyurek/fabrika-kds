@@ -5,6 +5,7 @@ import pandas as pd
 import requests
 import veritabani
 from grafikler import enerji_grafigi
+from moduller import ayarlar 
 
 def goster():
     st.title("⚡ Enerji — Tüketim ve Fatura Analizi")
@@ -94,15 +95,35 @@ def goster():
     st.subheader("🕐 Tarife Saati Optimizasyonu")
     st.caption("Elektrik gece ucuz, akşam (puant) pahalı. İşleri ucuz saate kaydırırsan tasarruf edersin.")
 
-    st.markdown("**Üç zamanlı tarife fiyatların (biliyorsan gir):**")
+    # Tarife fiyatlarını Fabrika Ayarları'ndan oku
+    ayar = ayarlar.ayarlari_oku()
+    try:
+        varsayilan_gunduz = float(ayar.get("tarife_gunduz", 2.85))
+        varsayilan_puant = float(ayar.get("tarife_puant", 4.20))
+        varsayilan_gece = float(ayar.get("tarife_gece", 1.60))
+    except (ValueError, TypeError):
+        varsayilan_gunduz, varsayilan_puant, varsayilan_gece = 2.85, 4.20, 1.60
+
+    st.markdown("**Üç zamanlı tarife fiyatların** (⚙️ Fabrika Ayarları'ndan okunur, buradan geçici değiştirebilirsin):")
     tf1, tf2, tf3 = st.columns(3)
-    gunduz_fiyat = tf1.number_input("Gündüz (TL/kWh)", min_value=0.0, value=2.85)
-    puant_fiyat = tf2.number_input("Puant / akşam (TL/kWh)", min_value=0.0, value=4.20)
-    gece_fiyat = tf3.number_input("Gece (TL/kWh)", min_value=0.0, value=1.60)
+    gunduz_fiyat = tf1.number_input("Gündüz (TL/kWh)", min_value=0.0, value=varsayilan_gunduz)
+    puant_fiyat = tf2.number_input("Puant / akşam (TL/kWh)", min_value=0.0, value=varsayilan_puant)
+    gece_fiyat = tf3.number_input("Gece (TL/kWh)", min_value=0.0, value=varsayilan_gece)
+
+    # Kaydırılabilir kWh önerisi: kayıtlı faturaların ortalamasından temkinli tahmin
+    oneri_kwh = 3000.0
+    oneri_kaynagi = "varsayılan değer"
+    if len(gecerli) >= 3:
+        aylik_ort = gecerli["toplam_tuketim_kwh"].mean()
+        oneri_kwh = round(aylik_ort * 0.25 / 100) * 100  # yüzlüğe yuvarla
+        oneri_kaynagi = f"kayıtlı {len(gecerli)} faturanın ortalamasından (aylık ~{aylik_ort:,.0f} kWh'in ~%25'i)"
 
     st.markdown("**Kaydırılabilir tüketim:**")
+    st.caption(f"💡 Başlangıç önerisi {oneri_kaynagi} hesaplandı. Kaba bir tahmindir — "
+               f"hangi makinelerin gece çalışabileceğini en iyi sen bilirsin, rakamı düzeltebilirsin.")
     ks1, ks2 = st.columns(2)
-    kaydirilabilir_kwh = ks1.number_input("Aylık kaç kWh'lik iş geceye kaydırılabilir?", min_value=0.0, value=3000.0,
+    kaydirilabilir_kwh = ks1.number_input("Aylık kaç kWh'lik iş geceye kaydırılabilir?", min_value=0.0,
+                                          value=float(oneri_kwh),
                                           help="Örn. enerji yoğun makinelerin bir kısmı gece çalıştırılabilirse")
     mevcut_saat = ks2.selectbox("Bu işler şu an hangi saatte yapılıyor?", ["Gündüz", "Puant / akşam"])
 
