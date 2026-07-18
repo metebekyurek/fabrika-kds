@@ -93,7 +93,7 @@ def goster():
     st.caption("⚠️ Birim fiyat geçmiş faturalardan hesaplanır. Zam/indirim olduysa yeni faturayı girince tahmin güncellenir.")
     st.markdown("---")
     st.subheader("🕐 Tarife Saati Optimizasyonu")
-    st.caption("Elektrik gece ucuz, akşam (puant) pahalı. İşleri ucuz saate kaydırırsan tasarruf edersin.")
+    st.caption("Elektrik gece ucuz, akşam saatleri (puant, 17:00-22:00) en pahalı. İşleri ucuz saate kaydırırsan tasarruf edersin.")
 
     # Tarife fiyatlarını Fabrika Ayarları'ndan oku
     ayar = ayarlar.ayarlari_oku()
@@ -148,7 +148,8 @@ def goster():
 
     if ges_var:
         gc1, gc2, gc3 = st.columns(3)
-        ges_kapasite = gc1.number_input("Panel kapasitesi (kWp)", min_value=0.0, value=10.0)
+        ges_kapasite = gc1.number_input("Panel kapasitesi (kWp)", min_value=0.0, value=10.0,
+                                        help="Panelin etiketinde/faturasında yazan kurulu güç. Bilmiyorsan paneli kurana sor.")
         enlem = gc2.number_input("Enlem", value=40.19, format="%.2f", help="Bursa ~40.19. Konumunun enlemini gir.")
         boylam = gc3.number_input("Boylam", value=29.06, format="%.2f", help="Bursa ~29.06.")
 
@@ -184,7 +185,7 @@ def goster():
                 else:
                     st.success(f"🟢 Üretim beklenen aralıkta. Paneller sağlıklı çalışıyor.")
 
-                st.caption(f"Bugünkü güneş ışınımı: {radyasyon_kwh:,.1f} kWh/m² · Performans oranı: {pr} (varsayım, veri arttıkça panele göre kalibre edilecek)")
+                st.caption(f"Bugünkü güneş ışınımı: {radyasyon_kwh:,.1f} kWh/m² · Hesapta panellerin %80 verimle çalıştığı varsayıldı (kayıplar için pay bırakılmış temkinli değer).")
             except Exception as e:
                 st.warning("⚠️ Hava verisi çekilemedi (internet yok veya API geçici erişilemez). İnternet gelince tekrar dene.")
     else:
