@@ -2,7 +2,7 @@ import streamlit as st
 
 
 def goster():
-    st.title("💰 Finans — Sanal CFO")
+    st.title("💰 Finans — Maliyet ve Teklif Hesabı") 
     st.subheader("Parça Başı Maliyet Hesabı")
     st.caption("Bir ürünü üretmenin gerçek maliyetini hesaplar. Elle giriş — Excel okuma sonra eklenecek.")
 
@@ -33,7 +33,13 @@ def goster():
         e1, e2, e3 = st.columns(3)
         motor_gucu_kw = e1.number_input("Motor gücü (kW)", min_value=0.0, value=15.0)
         calisma_saat = e2.number_input("Çalışma süresi (saat)", min_value=0.0, value=8.0)
-        birim_fiyat = e3.number_input("Elektrik fiyatı (TL/kWh)", min_value=0.0, value=2.85)
+        from moduller import ayarlar as _ayarlar
+        try:
+            _varsayilan_fiyat = float(_ayarlar.ayarlari_oku().get("tarife_gunduz", 2.85))
+        except (ValueError, TypeError):
+            _varsayilan_fiyat = 2.85
+        birim_fiyat = e3.number_input("Elektrik fiyatı (TL/kWh)", min_value=0.0, value=_varsayilan_fiyat,
+                                      help="⚙️ Fabrika Ayarları'ndaki gündüz tarifesinden okunur, geçici değiştirebilirsin") 
         elektrik_tl = motor_gucu_kw * calisma_saat * birim_fiyat
         st.caption(f"⚡ Hesaplanan elektrik: {motor_gucu_kw} kW × {calisma_saat} saat × {birim_fiyat} TL = **{elektrik_tl:,.2f} TL**")
 
