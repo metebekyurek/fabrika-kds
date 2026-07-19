@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import veritabani
+import os
+from datetime import datetime 
 
 # Varsayılan değerler — kullanıcı hiç ayar girmemişse bunlar kullanılır
 VARSAYILAN = {
@@ -65,3 +67,42 @@ def goster():
         }])
         veritabani.veri_kaydet("ayarlar", yeni)
         st.success("✅ Ayarlar kaydedildi!") 
+        # ================= YEDEKLEME =================
+    st.markdown("---")
+    st.subheader("💾 Veri Yedekleme")
+    st.caption("Tüm verilerin tek dosyada: fabrika.db. Düzenli yedek almak, olası kayıplara karşı sigortadır.")
+
+    db_yolu = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fabrika.db")
+
+    y1, y2 = st.columns(2)
+
+    with y1:
+        st.markdown("**Yedek al**")
+        if os.path.exists(db_yolu):
+            with open(db_yolu, "rb") as f:
+                db_bytes = f.read()
+            boyut_mb = len(db_bytes) / (1024 * 1024)
+            st.download_button(
+                "💾 Yedek dosyasını indir",
+                data=db_bytes,
+                file_name=f"fabrika_yedek_{datetime.now().strftime('%Y%m%d_%H%M')}.db",
+                mime="application/octet-stream",
+                help="İnen dosyayı USB'ye veya başka bir diske kopyala. Haftada bir yedek almak iyi alışkanlıktır."
+            )
+            st.caption(f"Veritabanı boyutu: {boyut_mb:.1f} MB")
+        else:
+            st.info("Henüz veritabanı dosyası oluşmamış — bir kayıt girince oluşur.")
+
+    with y2:
+        st.markdown("**Yedekten geri yükle**")
+        st.caption("⚠️ Mevcut TÜM verilerin üzerine yazar — geri alınamaz!")
+        yedek_dosya = st.file_uploader("Yedek dosyası seç (.db)", type=["db"], key="yedek_yukle")
+        if yedek_dosya is not None:
+            onay = st.checkbox("Mevcut verilerin silinip yedekteki verilerin geleceğini anladım", key="yedek_onay")
+            if onay and st.button("📤 Yedeği geri yükle", type="primary"):
+                try:
+                    with open(db_yolu, "wb") as f:
+                        f.write(yedek_dosya.getvalue())
+                    st.success("✅ Yedek geri yüklendi! Verilerin yenilenmesi için uygulamayı kapatıp BASLAT.bat ile yeniden aç.")
+                except Exception as e:
+                    st.error(f"❌ Geri yükleme başarısız: {e}")
