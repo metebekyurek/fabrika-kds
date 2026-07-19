@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi, gunluk_ozet_mail, ayarlar, urunler, demo_veri, oee_analiz, gunun_ozeti, kiyaslama
+from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi, gunluk_ozet_mail, ayarlar, urunler, demo_veri, oee_analiz, gunun_ozeti, kiyaslama, yardim
 
 st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
 
@@ -12,7 +12,7 @@ MENU_GRUPLARI = {
     "🏭 OPERASYON": ["Üretim", "OEE Analizi", "Bakım", "Bakım Takvimi", "Stok", "Enerji", "Finans"],
     "📋 TANIMLAR": ["Makineler", "Ürünler", "Fabrika Ayarları"],
     "📤 RAPOR & İLETİŞİM": ["PDF Rapor", "Günün Özeti Maili"],
-    "🔧 DİĞER": ["Demo Verisi"],
+    "🔧 DİĞER": ["Demo Verisi", "Yardım"],
 }
 
 if "aktif_sayfa" not in st.session_state:
@@ -46,7 +46,8 @@ SAYFALAR = {
     "PDF Rapor": pdf_rapor.goster,
     "Günün Özeti Maili": gunluk_ozet_mail.goster,
     "Demo Verisi": demo_veri.goster,
-    "Dönem Kıyaslama": kiyaslama.goster 
+    "Dönem Kıyaslama": kiyaslama.goster,
+    "Yardım": yardim.goster,
 }
 
 SAYFALAR[secim]()

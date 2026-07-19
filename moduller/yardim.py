@@ -187,4 +187,4 @@ def goster():
         Eski üretim/arıza kayıtları o makineye ait olduğu için geçmiş hesaplarda görünmeye devam eder —
         bu normaldir, geçmiş değişmez. Yeni kayıtlarda artık listede çıkmaz.
         """)
-    """)
+    
