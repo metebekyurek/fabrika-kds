@@ -3,6 +3,31 @@ import pandas as pd
 from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi, gunluk_ozet_mail, ayarlar, urunler, demo_veri, oee_analiz, gunun_ozeti, kiyaslama, yardim
 
 st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
+# ================= GİRİŞ EKRANI =================
+def _giris_kontrol():
+    """Doğru şifre girilmeden hiçbir sayfa gösterilmez."""
+    try:
+        dogru_sifre = st.secrets["GIRIS_SIFRESI"]
+    except Exception:
+        # secrets dosyası yoksa (yerel geliştirme kolaylığı) giriş istemeden aç
+        return True
+
+    if st.session_state.get("giris_yapildi"):
+        return True
+
+    st.title("🏭 Fabrika KDS")
+    st.caption("Devam etmek için giriş şifresini gir.")
+    sifre = st.text_input("Şifre", type="password", key="giris_sifre_kutu")
+    if st.button("Giriş", type="primary"):
+        if sifre == dogru_sifre:
+            st.session_state["giris_yapildi"] = True
+            st.rerun()
+        else:
+            st.error("❌ Şifre yanlış.")
+    return False
+
+if not _giris_kontrol():
+    st.stop() 
 
 st.sidebar.title("🏭 Fabrika KDS")
 st.sidebar.caption("Entegre Karar Destek Sistemi")

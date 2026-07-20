@@ -4,9 +4,9 @@ import veritabani
 import hesap_motoru
 
 def goster():
-    st.title("🎯 OEE — Toplam Ekipman Etkinliği")
-    st.caption("Dünya standardı verimlilik ölçüsü: makinen, ideal dünyada üretebileceğinin yüzde kaçını üretti?")
-
+    st.title("🎯 OEE — Makine Verimliliği")
+    st.caption("OEE, dünyada yaygın kullanılan verimlilik ölçüsüdür. Tek soruya cevap verir: "
+               "makinelerin, kusursuz şartlarda üretebileceğinin yüzde kaçını gerçekten üretti?") 
     veritabani.tablolari_olustur()
     uretim_df = veritabani.veri_oku("uretim")
 
@@ -51,17 +51,17 @@ def goster():
     oee = kullanilabilirlik * performans * kalite
 
     o1, o2, o3, o4 = st.columns(4)
-    o1.metric("Kullanılabilirlik", f"%{kullanilabilirlik*100:,.1f}", help="Planlanan sürenin ne kadarında makine gerçekten çalıştı")
-    o2.metric("Performans", f"%{performans*100:,.1f}", help="Çalışırken ideal hıza ne kadar yaklaştı")
-    o3.metric("Kalite", f"%{kalite*100:,.1f}", help="Üretilenlerin ne kadarı sağlam çıktı")
-    o4.metric("OEE", f"%{oee*100:,.1f}", help="Üçünün çarpımı — genel verimlilik")
+    o1.metric("Çalışma Oranı", f"%{kullanilabilirlik*100:,.1f}", help="Planlanan sürenin ne kadarında makine gerçekten çalıştı (duruşlar düşülür)")
+    o2.metric("Hız", f"%{performans*100:,.1f}", help="Makine çalışırken ideal hızına ne kadar yaklaştı")
+    o3.metric("Kalite", f"%{kalite*100:,.1f}", help="Üretilenlerin ne kadarı sağlam çıktı (fire düşülür)")
+    o4.metric("OEE", f"%{oee*100:,.1f}", help="Üçünün çarpımı — genel verimlilik notu")
 
     if oee >= 0.85:
-        st.success(f"🟢 OEE %{oee*100:,.1f} — dünya standardında (%85+). Bu seviyeyi korumak esas iş.")
+        st.success(f"🟢 OEE %{oee*100:,.1f} — iyi kabul edilen seviyenin (%85) üzerinde. Bu seviyeyi korumak esas iş.")
     elif oee >= 0.60:
-        st.warning(f"🟡 OEE %{oee*100:,.1f} — ortalamanın üstü ama dünya standardının (%85) altında. İyileştirme alanı var.")
+        st.warning(f"🟡 OEE %{oee*100:,.1f} — birçok fabrikadan iyi, ama iyi kabul edilen seviyenin (%85) altında. Kapatılabilir bir fark var — TL karşılığı aşağıda.")
     else:
-        st.error(f"🔴 OEE %{oee*100:,.1f} — kayıp büyük. Aşağıdaki TL hesabına bak.")
+        st.error(f"🔴 OEE %{oee*100:,.1f} — kayıp büyük. Aşağıdaki TL hesabına bak: en hızlı kazanç genelde duruşları azaltmakta.")
 
     st.markdown("**💰 Bu kaybın TL karşılığı**")
     st.caption("OEE %100 olsaydı üretebileceğin ama üretemediğin sağlam parçaların kâr değeri. Ürün kârları 📦 Ürünler sayfasından otomatik alınır.")

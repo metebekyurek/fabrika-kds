@@ -1,3 +1,4 @@
 gizli_ayarlar.py
 __pycache__/
 *.db
+.streamlit/secrets.toml
