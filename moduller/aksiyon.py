@@ -107,6 +107,29 @@ def _aksiyonlari_topla():
             "Stok",
             "acil",
         ))
+    else:
+        # Risk hesabı 0 çıksa bile kritik seviyedeki malzeme varsa hatırlat —
+        # Günün Özeti ile tutarlı olsun, ama abartılı TL iddiası yapma.
+        stok_df = veritabani.veri_oku("stok")
+        if not stok_df.empty and {"malzeme_adi", "mevcut_miktar", "kritik_seviye"}.issubset(stok_df.columns):
+            s = stok_df.copy()
+            s["mevcut_miktar"] = pd.to_numeric(s["mevcut_miktar"], errors="coerce")
+            s["kritik_seviye"] = pd.to_numeric(s["kritik_seviye"], errors="coerce")
+            kritikler = s[s["mevcut_miktar"] <= s["kritik_seviye"]].dropna(subset=["mevcut_miktar"])
+            if not kritikler.empty:
+                adlar = ", ".join(f"**{r['malzeme_adi']}**" for _, r in kritikler.head(4).iterrows())
+                aksiyonlar.append((
+                    0.0,
+                    f"📦 Kritik seviyedeki {len(kritikler)} malzemeyi sipariş et",
+                    [
+                        f"Kritik seviyenin altına inen malzemeler: {adlar}"
+                        + (" ve diğerleri." if len(kritikler) > 4 else "."),
+                        "Hesaba göre mevcut stok, ortalama tedarik süresinden uzun yetiyor — yani şu an **ölçülebilir bir TL riski yok.**",
+                        "Yine de tedarik gecikirse veya tüketim hızlanırsa durum değişir. Siparişi erken vermek bu riski tamamen sıfırlar.",
+                    ],
+                    "Stok",
+                    "orta",
+                ))    
 
     # --- 5. Vardiya farkı ---
     vardiya_ozet, vardiya_fark = hesap_motoru.vardiya_kiyasi()
