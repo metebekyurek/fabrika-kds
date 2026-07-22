@@ -167,7 +167,7 @@ def _aksiyonlari_topla():
                     "Arızayı beklemek yerine planlı bakım, aynı parayı daha az duruşla harcamaktır.",
                 ],
                 "Bakım",
-                "orta",
+                "yüksek",
             ))
 
     # Sıralama: önce aciliyet (acil > yüksek > orta), aynı seviyedeyse kazancı büyük olan üstte
@@ -199,6 +199,8 @@ def goster():
 
     st.markdown("---")
     st.subheader("🔥 Bu Haftanın İlk 3 İşi")
+    st.caption("ℹ️ Sıralama önce **aciliyete**, sonra kazanca göredir — bu yüzden kazancı daha büyük ama daha az acil bir iş "
+               "listede aşağıda kalabilir. Tümü için 'Diğer öneriler' bölümüne bak.") 
 
     for i, (kazanc, baslik, adimlar, sayfa, aciliyet) in enumerate(aksiyonlar[:3], 1):
         renk = {"acil": "🔴", "yüksek": "🟠", "orta": "🟡"}.get(aciliyet, "🟡")
