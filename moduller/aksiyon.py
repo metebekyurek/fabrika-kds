@@ -147,7 +147,9 @@ def _aksiyonlari_topla():
                 "orta",
             ))
 
-    aksiyonlar.sort(key=lambda x: x[0], reverse=True)
+    # Sıralama: önce aciliyet (acil > yüksek > orta), aynı seviyedeyse kazancı büyük olan üstte
+    aciliyet_sirasi = {"acil": 0, "yüksek": 1, "orta": 2}
+    aksiyonlar.sort(key=lambda x: (aciliyet_sirasi.get(x[4], 3), -x[0]))
     return aksiyonlar
 
 def goster():
