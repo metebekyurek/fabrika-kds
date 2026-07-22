@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi, gunluk_ozet_mail, ayarlar, urunler, demo_veri, oee_analiz, gunun_ozeti, kiyaslama, yardim
+from moduller import finans, bakim, uretim, enerji, stok, makineler, kar_sizintisi, capraz_zeka, kar_simulatoru, pdf_rapor, bakim_takvimi, gunluk_ozet_mail, ayarlar, urunler, demo_veri, oee_analiz, gunun_ozeti, kiyaslama, yardim, aksiyon
 
 st.set_page_config(page_title="Fabrika KDS", page_icon="🏭", layout="wide")
 # ================= GİRİŞ EKRANI =================
@@ -33,7 +33,7 @@ st.sidebar.title("🏭 Fabrika KDS")
 st.sidebar.caption("Entegre Karar Destek Sistemi")
 
 MENU_GRUPLARI = {
-    "📊 GENEL BAKIŞ": ["Günün Özeti", "Kâr Sızıntısı", "Çapraz Zekâ", "Simülatör", "Dönem Kıyaslama"],
+    "📊 GENEL BAKIŞ": ["Günün Özeti", "Aksiyon Önerileri", "Kâr Sızıntısı", "Çapraz Zekâ", "Simülatör", "Dönem Kıyaslama"],
     "🏭 OPERASYON": ["Üretim", "OEE Analizi", "Bakım", "Bakım Takvimi", "Stok", "Enerji", "Finans"],
     "📋 TANIMLAR": ["Makineler", "Ürünler", "Fabrika Ayarları"],
     "📤 RAPOR & İLETİŞİM": ["PDF Rapor", "Günün Özeti Maili"],
@@ -73,6 +73,7 @@ SAYFALAR = {
     "Demo Verisi": demo_veri.goster,
     "Dönem Kıyaslama": kiyaslama.goster,
     "Yardım": yardim.goster,
+    "Aksiyon Önerileri": aksiyon.goster,
 }
 
 SAYFALAR[secim]()
