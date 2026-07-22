@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from fpdf import FPDF
 import veritabani
 import hesap_motoru
-from moduller import ayarlar
+from moduller import ayarlar, aksiyon
 
 # Font dosyalarının yolu: proje kökündeki fontlar/ klasörü
 FONT_KLASORU = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fontlar")
@@ -42,6 +42,26 @@ def _baslik(pdf, metin):
     pdf.set_font(ANA_FONT, "B", 12)
     pdf.cell(0, 8, _tr(metin), new_x="LMARGIN", new_y="NEXT")
     pdf.set_font(ANA_FONT, "", 10)
+
+def _sadelestir(metin):
+    """Emoji ve markdown işaretlerini temizler."""
+    temiz = str(metin).replace("**", "")
+    return "".join(k for k in temiz if ord(k) < 0x2000).strip()
+
+def _satirla(metin, sinir=95):
+    """Uzun metni kelime kelime bölerek satır listesine çevirir."""
+    kelimeler = metin.split()
+    satirlar, aktif = [], ""
+    for kelime in kelimeler:
+        if len(aktif) + len(kelime) + 1 <= sinir:
+            aktif = f"{aktif} {kelime}".strip()
+        else:
+            if aktif:
+                satirlar.append(aktif)
+            aktif = kelime
+    if aktif:
+        satirlar.append(aktif)
+    return satirlar
 
 def rapor_olustur(firma_adi, gun_araligi, bolumler):
     """Seçilen dönem ve bölümlerle PDF üretir, bytes döner."""
@@ -129,6 +149,32 @@ def rapor_olustur(firma_adi, gun_araligi, bolumler):
                 for _, r in kritik.iterrows():
                     pdf.cell(0, 6, _tr(f"   {r['malzeme_adi']}: {r['mevcut_miktar']:,.0f} kaldı (kritik: {r['kritik_seviye']:,.0f}) — SİPARİŞ ZAMANI"), new_x="LMARGIN", new_y="NEXT")
 
+    if "Aksiyon önerileri" in bolumler:
+        try:
+            oneriler = aksiyon._aksiyonlari_topla()
+        except Exception:
+            oneriler = []
+        if oneriler:
+            _baslik(pdf, "Öncelikli Aksiyonlar — Bu Hafta Ne Yapmalı?")
+            for i, (kazanc, ad, adimlar, sayfa, aciliyet) in enumerate(oneriler[:3], 1):
+                pdf.set_font(ANA_FONT, "B", 10)
+                temiz_ad = _sadelestir(ad)
+                if kazanc > 0:
+                    ust_satir = f"{i}. {temiz_ad} (olası kazanç: {kazanc:,.0f} TL, aciliyet: {aciliyet})"
+                else:
+                    ust_satir = f"{i}. {temiz_ad} (aciliyet: {aciliyet})"
+                for satir in _satirla(ust_satir, 85):
+                    pdf.cell(0, 6, _tr(satir), new_x="LMARGIN", new_y="NEXT")
+
+                pdf.set_font(ANA_FONT, "", 9)
+                for adim in adimlar:
+                    parcalar = _satirla(_sadelestir(adim), 105)
+                    for j, satir in enumerate(parcalar):
+                        onek = "- " if j == 0 else "  "
+                        pdf.cell(0, 5, _tr(f"{onek}{satir}"), new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(2)
+            pdf.set_font(ANA_FONT, "", 10)
+
     # --- Alt not ---
     pdf.ln(8)
     pdf.set_font(ANA_FONT, "", 8)
@@ -160,6 +206,7 @@ def goster():
     if b1.checkbox("Duruş dökümü (makine bazında)", value=True): bolumler.append("Duruş dökümü")
     if b2.checkbox("Bakım durumu (geciken/yaklaşan)", value=True): bolumler.append("Bakım durumu")
     if b2.checkbox("Kritik stoklar", value=True): bolumler.append("Kritik stoklar")
+    if b2.checkbox("Aksiyon önerileri (ne yapmalı?)", value=True): bolumler.append("Aksiyon önerileri")
 
     if st.button("📄 Raporu oluştur", type="primary"):
         try:
